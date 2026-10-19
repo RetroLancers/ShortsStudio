@@ -47,7 +47,7 @@
   #shortList { flex: 1; overflow: auto; padding: 4px 8px 12px; }
   #status { padding: 8px 14px 12px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
   .short { margin-bottom: 4px; }
-  .short-head, .file, .group {
+  .short-head, .file, .group, .folder-head {
     width: 100%;
     text-align: left;
     background: transparent;
@@ -56,8 +56,8 @@
     color: var(--text);
   }
   .short-head { padding: 6px 8px; display: flex; gap: 6px; align-items: baseline; }
-  .short-head:hover, .file:hover { background: #232833; }
-  .short-head .caret { color: var(--muted); width: 10px; }
+  .short-head:hover, .file:hover, .folder-head:hover { background: #232833; }
+  .short-head .caret, .folder-head .caret { color: var(--muted); width: 10px; flex: none; }
   .short-head .mtime { margin-left: auto; color: var(--muted); font-size: 11px; }
   .group {
     padding: 6px 8px 2px 24px;
@@ -67,9 +67,58 @@
     text-transform: uppercase;
     cursor: default;
   }
-  .file { padding: 4px 8px 4px 24px; color: #d5dbe6; font-size: 13px; }
-  .file.open { background: #24312f; color: var(--accent); }
+  .file {
+    padding: 4px 8px 4px 24px;
+    color: #d5dbe6;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .file.open, .folder-head.open { background: #24312f; color: var(--accent); }
+  .file .names { flex: 1; min-width: 0; }
   .file .path { display: block; color: var(--muted); font-size: 11px; }
+  .folder-head { padding: 4px 8px 4px 24px; display: flex; gap: 6px; align-items: baseline; }
+  .folder-head .label { flex: 1; min-width: 0; }
+  .rev-badge {
+    flex: none;
+    width: 16px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .rev-badge.yes { color: var(--ok); }
+  .rev-badge.no { color: var(--danger); }
+  #filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 10px 8px;
+  }
+  .chip {
+    background: #232833;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .chip.on {
+    background: #1c3330;
+    border-color: #3d7a6a;
+    color: var(--text);
+  }
+  #unreviewedRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px 10px;
+    color: var(--muted);
+    font-size: 12px;
+    user-select: none;
+  }
+  #unreviewedRow input { accent-color: var(--accent); }
   main {
     flex: 1;
     min-width: 0;
@@ -343,12 +392,34 @@
     height: auto;
     margin: 0;
   }
-  #galleryPane { overflow: auto; padding: 12px; }
+  #galleryPane {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    padding: 12px;
+  }
+  #galleryToolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #playAllBtn {
+    background: #1c3330;
+    border: 1px solid #3d7a6a;
+    border-radius: 6px;
+    padding: 4px 12px;
+  }
   #galleryGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 12px;
     align-content: start;
+  }
+  #galleryGrid.list, #galleryGrid.playlist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .thumb {
     display: flex;
@@ -369,7 +440,99 @@
     background: #000;
     border-radius: 4px;
   }
-  .thumb span { font-size: 12px; word-break: break-all; }
+  .thumb .thumb-meta {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .thumb span { font-size: 12px; word-break: break-all; flex: 1; }
+  .folder-item, .playlist-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #0e1218;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: inherit;
+    text-align: left;
+  }
+  .playlist-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .folder-item-head, .thumb-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .folder-item .name, .playlist-row .name {
+    flex: 1;
+    min-width: 80px;
+    word-break: break-all;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    color: inherit;
+  }
+  .folder-item .name:hover, .playlist-row .name:hover { color: var(--accent); }
+  .folder-item audio, .playlist-row audio { width: 100%; }
+  .playlist-row audio { flex: 2; min-width: 180px; }
+  .folder-item video {
+    width: 100%;
+    max-height: 200px;
+    background: #000;
+    border-radius: 4px;
+  }
+  .quick-rev { display: flex; gap: 4px; flex: none; }
+  .quick-rev button {
+    background: #262b36;
+    border: 1px solid #3a4150;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+  .quick-rev button.on.yes, #reviewYes.on { background: #1c3330; border-color: var(--ok); color: var(--ok); }
+  .quick-rev button.on.no, #reviewNo.on { background: #3a2226; border-color: var(--danger); color: var(--danger); }
+  #reviewBar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--line);
+    background: #14171e;
+  }
+  #reviewBar .review-label { color: var(--muted); font-size: 12px; }
+  #reviewYes, #reviewNo, #reviewSave, #reviewClear, #playAllBtn {
+    background: #262b36;
+    border: 1px solid #3a4150;
+    border-radius: 6px;
+    padding: 4px 8px;
+  }
+  #playAllBtn {
+    background: #1c3330;
+    border-color: #3d7a6a;
+  }
+  #reviewNote {
+    flex: 1;
+    min-width: 140px;
+    height: 32px;
+    resize: none;
+    background: #101218;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  #reviewWhen { font-size: 11px; }
+  #infoPane { overflow: auto; padding: 24px 28px; }
+  #infoPane h2 { margin: 0 0 12px; font-size: 18px; word-break: break-all; }
+  #infoPane dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin: 0; }
+  #infoPane dt { color: var(--muted); }
+  #infoPane dd { margin: 0; word-break: break-all; }
   #notesPane {
     width: 320px;
     flex: none;
@@ -435,6 +598,16 @@
       <h1>Shorts Studio</h1>
       <p id="rootLabel"></p>
     </div>
+    <div id="filters" role="group" aria-label="File type filters">
+      <button type="button" class="chip on" data-filter="video">Video</button>
+      <button type="button" class="chip on" data-filter="audio">Audio</button>
+      <button type="button" class="chip on" data-filter="image">Image</button>
+      <button type="button" class="chip on" data-filter="text">Text</button>
+      <button type="button" class="chip on" data-filter="other">Other</button>
+    </div>
+    <label id="unreviewedRow">
+      <input type="checkbox" id="unreviewedOnly"> Unreviewed only
+    </label>
     <div id="shortList"></div>
     <div id="status"></div>
   </aside>
@@ -460,6 +633,15 @@
       <span>This file changed on disk and you have unsaved edits.</span>
       <button id="reloadDisk" type="button">Reload from disk (lose my edits)</button>
       <button id="keepMine" type="button">Keep mine</button>
+    </div>
+    <div id="reviewBar" hidden>
+      <span class="review-label">Review</span>
+      <button type="button" id="reviewYes">Yes</button>
+      <button type="button" id="reviewNo">No</button>
+      <textarea id="reviewNote" rows="1" placeholder="Note" aria-label="Review note"></textarea>
+      <button type="button" id="reviewSave">Save</button>
+      <button type="button" id="reviewClear">Clear</button>
+      <span id="reviewWhen" class="muted"></span>
     </div>
     <section id="empty" class="pane">Open a file from the sidebar. Ctrl+S saves.</section>
     <section id="textPane" class="pane" hidden>
@@ -492,7 +674,19 @@
         </form>
       </aside>
     </section>
+    <section id="infoPane" class="pane" hidden>
+      <h2 id="infoName"></h2>
+      <dl>
+        <dt>Path</dt><dd id="infoPath"></dd>
+        <dt>Size</dt><dd id="infoSize"></dd>
+        <dt>Modified</dt><dd id="infoMtime"></dd>
+      </dl>
+    </section>
     <section id="galleryPane" class="pane" hidden>
+      <div id="galleryToolbar" hidden>
+        <button type="button" id="playAllBtn">Play all</button>
+        <span id="playAllStatus" class="muted"></span>
+      </div>
       <div id="galleryGrid"></div>
     </section>
     <div id="toasts"></div>
@@ -534,7 +728,24 @@
     imageWrap: document.getElementById("imageWrap"),
     image: document.getElementById("image"),
     galleryPane: document.getElementById("galleryPane"),
+    galleryToolbar: document.getElementById("galleryToolbar"),
     galleryGrid: document.getElementById("galleryGrid"),
+    playAllBtn: document.getElementById("playAllBtn"),
+    playAllStatus: document.getElementById("playAllStatus"),
+    infoPane: document.getElementById("infoPane"),
+    infoName: document.getElementById("infoName"),
+    infoPath: document.getElementById("infoPath"),
+    infoSize: document.getElementById("infoSize"),
+    infoMtime: document.getElementById("infoMtime"),
+    filters: document.getElementById("filters"),
+    unreviewedOnly: document.getElementById("unreviewedOnly"),
+    reviewBar: document.getElementById("reviewBar"),
+    reviewYes: document.getElementById("reviewYes"),
+    reviewNo: document.getElementById("reviewNo"),
+    reviewNote: document.getElementById("reviewNote"),
+    reviewSave: document.getElementById("reviewSave"),
+    reviewClear: document.getElementById("reviewClear"),
+    reviewWhen: document.getElementById("reviewWhen"),
     reviewFile: document.getElementById("reviewFile"),
     noteList: document.getElementById("noteList"),
     noteForm: document.getElementById("noteForm"),
@@ -548,14 +759,22 @@
     shorts: [],
     treeSig: "",
     expanded: new Set(),
+    collapsedDirs: new Set(),
     tabs: [],
     active: null,
     lastSeq: null,
     status: "",
     restoring: false,
+    reviews: {},
+    filters: { video: true, audio: true, image: true, text: true, other: true },
+    unreviewedOnly: false,
+    reviewDraftDirty: false,
+    playAll: null,
   };
 
   const OPEN_TABS_KEY = "studio.openTabs";
+  const FILTERS_KEY = "studio.fileFilters";
+  const UNREVIEWED_KEY = "studio.unreviewedOnly";
   let dragTab = null;
 
   function showBanner(text, level, timeoutSec) {
@@ -652,6 +871,66 @@
     if (!ms) return "";
     const d = new Date(ms);
     return d.toLocaleString();
+  }
+
+  function formatSize(n) {
+    const size = Number(n) || 0;
+    if (size < 1024) return size + " bytes";
+    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+    return (size / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function reviewKey(short, file) {
+    return short + "/" + String(file || "").replace(/\\/g, "/");
+  }
+
+  function reviewOf(short, file) {
+    return state.reviews[reviewKey(short, file)] || null;
+  }
+
+  function loadFilters() {
+    try {
+      const data = JSON.parse(localStorage.getItem(FILTERS_KEY) || "");
+      if (data && typeof data === "object") {
+        for (const key of ["video", "audio", "image", "text", "other"]) {
+          if (typeof data[key] === "boolean") state.filters[key] = data[key];
+        }
+      }
+    } catch {
+      // Storage can be unavailable.
+    }
+    try {
+      state.unreviewedOnly = localStorage.getItem(UNREVIEWED_KEY) === "1";
+    } catch {
+      // Storage can be unavailable.
+    }
+    syncFilterChrome();
+  }
+
+  function persistFilters() {
+    try {
+      localStorage.setItem(FILTERS_KEY, JSON.stringify(state.filters));
+      localStorage.setItem(UNREVIEWED_KEY, state.unreviewedOnly ? "1" : "0");
+    } catch {
+      // Storage can be unavailable.
+    }
+  }
+
+  function syncFilterChrome() {
+    for (const btn of els.filters.querySelectorAll("[data-filter]")) {
+      btn.classList.toggle("on", Boolean(state.filters[btn.dataset.filter]));
+    }
+    els.unreviewedOnly.checked = Boolean(state.unreviewedOnly);
+  }
+
+  function appendReviewBadge(parent, short, file) {
+    const review = reviewOf(short, file);
+    if (!review) return;
+    const badge = document.createElement("span");
+    badge.className = "rev-badge " + review.verdict;
+    badge.textContent = review.verdict === "yes" ? "✓" : "✕";
+    badge.title = (review.note ? review.note + " — " : "") + (review.updatedAt || review.verdict);
+    parent.append(badge);
   }
 
   function changedLines(oldText, newText) {
@@ -863,6 +1142,49 @@
     return folder.text.find((item) => item.name === file) || folder.media.find((item) => item.name === file) || null;
   }
 
+  function allShortFiles(folder) {
+    const files = [];
+    for (const item of folder.text || []) {
+      files.push({ name: item.name, mtime: item.mtime, size: item.size, kind: "text" });
+    }
+    for (const item of folder.media || []) {
+      files.push({ name: item.name, mtime: item.mtime, size: item.size, kind: item.kind || "other" });
+    }
+    return files;
+  }
+
+  function fileVisible(short, item) {
+    const kind = item.kind || "text";
+    if (!state.filters[kind]) return false;
+    if (state.unreviewedOnly && reviewOf(short, item.name)) return false;
+    return true;
+  }
+
+  function dirTreeFromFiles(fileItems) {
+    const root = { name: "", dirs: new Map(), files: [] };
+    for (const item of fileItems) {
+      const parts = String(item.name).split("/");
+      let node = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const seg = parts[i];
+        if (!node.dirs.has(seg)) node.dirs.set(seg, { name: seg, dirs: new Map(), files: [] });
+        node = node.dirs.get(seg);
+      }
+      node.files.push(item);
+    }
+    return root;
+  }
+
+  function openListedFile(short, item) {
+    const kind = item.kind || "text";
+    const job = kind === "text"
+      ? openText(short, item.name)
+      : kind === "other"
+        ? openInfo(short, item.name)
+        : openMedia(short, item.name, kind);
+    job.catch((err) => showBanner(err.message, "warn", 5));
+  }
+
   function renderSidebar() {
     const scroll = els.shortList.scrollTop;
     els.shortList.replaceChildren();
@@ -878,9 +1200,17 @@
       const head = document.createElement("button");
       head.type = "button";
       head.className = "short-head";
+      const galOpen = state.tabs.some((tab) => tab.kind === "gallery" && tab.short === folder.name && !tab.file);
+      if (galOpen) head.classList.add("open");
       const caret = document.createElement("span");
       caret.className = "caret";
       caret.textContent = state.expanded.has(folder.name) ? "▾" : "▸";
+      caret.onclick = (event) => {
+        event.stopPropagation();
+        if (state.expanded.has(folder.name)) state.expanded.delete(folder.name);
+        else state.expanded.add(folder.name);
+        renderSidebar();
+      };
       const name = document.createElement("span");
       name.textContent = folder.name;
       const when = document.createElement("span");
@@ -888,14 +1218,13 @@
       when.textContent = folder.mtime ? formatWhen(folder.mtime).split(",")[0] : "";
       head.append(caret, name, when);
       head.onclick = () => {
-        if (state.expanded.has(folder.name)) state.expanded.delete(folder.name);
-        else state.expanded.add(folder.name);
-        renderSidebar();
+        state.expanded.add(folder.name);
+        openGallery(folder.name, "").catch((err) => showBanner(err.message, "warn", 5));
       };
       wrap.append(head);
       if (state.expanded.has(folder.name)) {
-        addGroup(wrap, folder, "Text", folder.text, "text");
-        addGroup(wrap, folder, "Media", folder.media, "media");
+        const visible = allShortFiles(folder).filter((item) => fileVisible(folder.name, item));
+        renderDirNode(wrap, folder.name, dirTreeFromFiles(visible), "", 0);
       }
       els.shortList.append(wrap);
     }
@@ -904,31 +1233,56 @@
     els.status.textContent = state.status || "";
   }
 
-  function addGroup(wrap, folder, label, files, group) {
-    if (!files.length) return;
-    const title = document.createElement("div");
-    title.className = "group";
-    title.textContent = label;
-    wrap.append(title);
+  function renderDirNode(wrap, short, node, rel, depth) {
+    const dirNames = Array.from(node.dirs.keys()).sort((a, b) => a.localeCompare(b));
+    for (const dirName of dirNames) {
+      const child = node.dirs.get(dirName);
+      const childRel = rel ? rel + "/" + dirName : dirName;
+      const folderKey = short + "/" + childRel;
+      const expanded = !state.collapsedDirs.has(folderKey);
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "folder-head";
+      head.style.paddingLeft = 24 + depth * 12 + "px";
+      const galOpen = state.tabs.some((tab) => tab.kind === "gallery" && tab.short === short && tab.file === childRel);
+      if (galOpen) head.classList.add("open");
+      const caret = document.createElement("span");
+      caret.className = "caret";
+      caret.textContent = expanded ? "▾" : "▸";
+      caret.onclick = (event) => {
+        event.stopPropagation();
+        if (state.collapsedDirs.has(folderKey)) state.collapsedDirs.delete(folderKey);
+        else state.collapsedDirs.add(folderKey);
+        renderSidebar();
+      };
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = dirName;
+      head.append(caret, label);
+      head.onclick = () => {
+        state.collapsedDirs.delete(folderKey);
+        openGallery(short, childRel).catch((err) => showBanner(err.message, "warn", 5));
+      };
+      wrap.append(head);
+      if (expanded) renderDirNode(wrap, short, child, childRel, depth + 1);
+    }
+    const files = node.files.slice().sort((a, b) => a.name.localeCompare(b.name));
     for (const item of files) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "file";
-      const open = state.tabs.some((tab) => tab.short === folder.name && tab.file === item.name);
+      btn.style.paddingLeft = 24 + depth * 12 + "px";
+      const open = state.tabs.some((tab) => tab.short === short && tab.file === item.name && tab.kind !== "gallery");
       if (open) btn.classList.add("open");
       btn.title = formatWhen(item.mtime);
-      const base = item.name.split("/").pop();
-      btn.textContent = base;
-      if (item.name.includes("/")) {
-        const sub = document.createElement("span");
-        sub.className = "path";
-        sub.textContent = item.name.slice(0, item.name.length - base.length - 1);
-        btn.prepend(sub);
-      }
-      btn.onclick = () => {
-        const job = group === "media" ? openMedia(folder.name, item.name, item.kind) : openText(folder.name, item.name);
-        job.catch((err) => showBanner(err.message, "warn", 5));
-      };
+      const names = document.createElement("span");
+      names.className = "names";
+      const base = document.createElement("span");
+      base.textContent = item.name.split("/").pop();
+      names.append(base);
+      btn.append(names);
+      appendReviewBadge(btn, short, item.name);
+      btn.onclick = () => openListedFile(short, item);
       wrap.append(btn);
     }
   }
@@ -1000,6 +1354,7 @@
     els.textPane.hidden = which !== "text";
     els.mediaPane.hidden = which !== "media";
     els.galleryPane.hidden = which !== "gallery";
+    els.infoPane.hidden = which !== "info";
   }
 
   function stashText() {
@@ -1010,6 +1365,7 @@
   }
 
   function pauseMedia() {
+    stopPlayAll();
     if (state.active && state.active.kind === "audio") {
       state.active.time = els.audio.currentTime;
       els.audio.pause();
@@ -1025,6 +1381,7 @@
       const prevMode = els.textPane.dataset.view || "";
       renderTabs();
       updateConflict();
+      syncReviewBar();
       if (tab && tab.kind === "text") {
         const mode = isMarkdownFile(tab.file) ? (tab.mdView || "preview") : "edit";
         const contentChanged = els.editor.value !== tab.content;
@@ -1038,11 +1395,13 @@
     }
     stashText();
     pauseMedia();
+    state.reviewDraftDirty = false;
     state.active = tab;
     renderTabs();
     updateConflict();
     if (!tab) {
       showPane("empty");
+      syncReviewBar();
       persistTabs();
       return;
     }
@@ -1053,17 +1412,27 @@
       renderGutter();
       renderPreview();
       if (!isMarkdownFile(tab.file) || tab.mdView !== "preview") els.editor.focus();
+      syncReviewBar();
       persistTabs();
       return;
     }
     if (tab.kind === "gallery") {
       showPane("gallery");
       renderGallery(tab);
+      syncReviewBar();
+      persistTabs();
+      return;
+    }
+    if (tab.kind === "other") {
+      showPane("info");
+      renderInfo(tab);
+      syncReviewBar();
       persistTabs();
       return;
     }
     showPane("media");
     loadMedia(tab);
+    syncReviewBar();
     persistTabs();
   }
 
@@ -1115,6 +1484,7 @@
       showPane("empty");
       renderTabs();
       updateConflict();
+      syncReviewBar();
     } else {
       renderTabs();
     }
@@ -1134,6 +1504,7 @@
     showPane("empty");
     renderTabs();
     updateConflict();
+    syncReviewBar();
     renderSidebar();
     persistTabs();
   }
@@ -1221,11 +1592,18 @@
     persistTabs();
   }
 
-  function inferMediaKind(file) {
+  function inferKind(file) {
     const lower = String(file || "").toLowerCase();
+    if (lower.endsWith(".md") || lower.endsWith(".txt")) return "text";
     if (lower.endsWith(".mp4")) return "video";
     if (/\.(png|jpe?g|webp)$/.test(lower)) return "image";
-    return "audio";
+    if (lower.endsWith(".wav") || lower.endsWith(".mp3")) return "audio";
+    return "other";
+  }
+
+  function inferMediaKind(file) {
+    const kind = inferKind(file);
+    return kind === "text" || kind === "other" ? "audio" : kind;
   }
 
   async function openMedia(short, file, kind, opts) {
@@ -1260,22 +1638,29 @@
     persistTabs();
   }
 
-  function galleryImages(short, folder) {
-    const meta = state.shorts.find((item) => item.name === short);
-    if (!meta) return [];
+  function inFolder(name, folder) {
     const prefix = folder ? String(folder).replace(/\\/g, "/").replace(/\/$/, "") + "/" : "";
-    return meta.media.filter((item) => {
-      if (item.kind !== "image") return false;
-      if (!prefix) return item.name.indexOf("/") === -1;
-      if (!item.name.startsWith(prefix)) return false;
-      return item.name.indexOf("/", prefix.length) === -1;
-    });
+    if (!prefix) return name.indexOf("/") === -1;
+    if (!name.startsWith(prefix)) return false;
+    return name.indexOf("/", prefix.length) === -1;
   }
 
-  function sameImages(a, b) {
+  function galleryFiles(short, folder) {
+    const meta = state.shorts.find((item) => item.name === short);
+    if (!meta) return [];
+    return allShortFiles(meta)
+      .filter((item) => inFolder(item.name, folder))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function galleryImages(short, folder) {
+    return galleryFiles(short, folder).filter((item) => item.kind === "image");
+  }
+
+  function sameFiles(a, b) {
     if (!a || !b || a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
-      if (a[i].name !== b[i].name || a[i].mtime !== b[i].mtime || a[i].size !== b[i].size) return false;
+      if (a[i].name !== b[i].name || a[i].mtime !== b[i].mtime || a[i].size !== b[i].size || a[i].kind !== b[i].kind) return false;
     }
     return true;
   }
@@ -1284,13 +1669,16 @@
     state.expanded.add(short);
     const file = folder ? String(folder).replace(/\\/g, "/").replace(/\/$/, "") : "";
     let tab = state.tabs.find((item) => item.kind === "gallery" && item.short === short && item.file === file);
-    const live = galleryImages(short, file);
+    const live = galleryFiles(short, file);
+    const seededFiles = Array.isArray(opts && opts.files) ? opts.files : null;
     const seeded = Array.isArray(images) ? images : [];
+    const files = live.length ? live : (seededFiles && seededFiles.length ? seededFiles : seeded.map((item) => Object.assign({ kind: "image" }, item)));
     if (!tab) {
-      tab = { kind: "gallery", short, file, images: live.length ? live : seeded };
+      tab = { kind: "gallery", short, file, files, images: files.filter((item) => item.kind === "image") };
       state.tabs.push(tab);
     } else {
-      tab.images = live.length ? live : (seeded.length ? seeded : tab.images || []);
+      tab.files = files.length ? files : (tab.files || []);
+      tab.images = tab.files.filter((item) => item.kind === "image");
     }
     if (!(opts && opts.restore)) {
       activate(tab);
@@ -1299,31 +1687,224 @@
     persistTabs();
   }
 
+  function isAudioHeavy(files) {
+    const audio = files.filter((item) => item.kind === "audio").length;
+    return audio >= 2 && audio >= files.length / 2;
+  }
+
+  function stopPlayAll() {
+    const job = state.playAll;
+    if (!job) return;
+    if (job.audio) {
+      job.audio.pause();
+      job.audio.removeEventListener("ended", job.onEnded);
+    }
+    state.playAll = null;
+    if (els.playAllBtn) els.playAllBtn.textContent = "Play all";
+    if (els.playAllStatus) els.playAllStatus.textContent = "";
+  }
+
+  function playAllAt(tab, index) {
+    const files = (tab.files || []).filter((item) => item.kind === "audio");
+    if (!files.length || index >= files.length) {
+      stopPlayAll();
+      return;
+    }
+    const rows = els.galleryGrid.querySelectorAll("audio[data-file]");
+    let audio = null;
+    for (const el of rows) {
+      if (el.getAttribute("data-file") === files[index].name) audio = el;
+      else el.pause();
+    }
+    if (!audio) {
+      stopPlayAll();
+      return;
+    }
+    const onEnded = () => playAllAt(tab, index + 1);
+    if (state.playAll && state.playAll.audio) {
+      state.playAll.audio.removeEventListener("ended", state.playAll.onEnded);
+    }
+    state.playAll = { tab, index, audio, onEnded };
+    audio.addEventListener("ended", onEnded);
+    audio.play().catch(() => playAllAt(tab, index + 1));
+    els.playAllBtn.textContent = "Stop";
+    els.playAllStatus.textContent = "Playing " + files[index].name.split("/").pop();
+  }
+
+  function startPlayAll(tab) {
+    if (state.playAll && state.playAll.tab === tab) {
+      stopPlayAll();
+      return;
+    }
+    stopPlayAll();
+    playAllAt(tab, 0);
+  }
+
+  function addQuickReview(parent, short, file) {
+    const review = reviewOf(short, file);
+    const box = document.createElement("span");
+    box.className = "quick-rev";
+    const yes = document.createElement("button");
+    yes.type = "button";
+    yes.textContent = "Yes";
+    yes.className = review && review.verdict === "yes" ? "on yes" : "";
+    const no = document.createElement("button");
+    no.type = "button";
+    no.textContent = "No";
+    no.className = review && review.verdict === "no" ? "on no" : "";
+    yes.onclick = (event) => {
+      event.stopPropagation();
+      saveReviewFor(short, file, "yes", review ? review.note : "").catch((err) => showBanner(err.message, "warn", 5));
+    };
+    no.onclick = (event) => {
+      event.stopPropagation();
+      saveReviewFor(short, file, "no", review ? review.note : "").catch((err) => showBanner(err.message, "warn", 5));
+    };
+    box.append(yes, no);
+    parent.append(box);
+  }
+
   function renderGallery(tab) {
+    stopPlayAll();
     els.galleryGrid.replaceChildren();
-    const images = tab.images || [];
-    if (!images.length) {
+    const files = (tab.files && tab.files.length ? tab.files : galleryFiles(tab.short, tab.file)).slice().sort((a, b) => a.name.localeCompare(b.name));
+    tab.files = files;
+    tab.images = files.filter((item) => item.kind === "image");
+    const audioHeavy = isAudioHeavy(files);
+    els.galleryToolbar.hidden = !audioHeavy;
+    els.galleryGrid.classList.toggle("playlist", audioHeavy);
+    els.galleryGrid.classList.toggle("list", !audioHeavy && files.some((item) => item.kind !== "image"));
+    if (!audioHeavy && !files.some((item) => item.kind !== "image")) els.galleryGrid.classList.remove("list");
+    if (!files.length) {
       const p = document.createElement("p");
       p.className = "muted";
-      p.textContent = "No images in this folder.";
+      p.textContent = "No files in this folder.";
       els.galleryGrid.append(p);
       return;
     }
-    for (const item of images) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "thumb";
-      const img = document.createElement("img");
-      img.src = mediaUrl(tab.short, item.name);
-      img.alt = item.name.split("/").pop();
-      const label = document.createElement("span");
-      label.textContent = item.name.split("/").pop();
-      btn.append(img, label);
-      btn.onclick = () => {
-        openMedia(tab.short, item.name, "image").catch((err) => showBanner(err.message, "warn", 5));
-      };
-      els.galleryGrid.append(btn);
+    if (audioHeavy) {
+      for (const item of files) els.galleryGrid.append(renderPlaylistRow(tab, item));
+      return;
     }
+    for (const item of files) {
+      if (item.kind === "image") els.galleryGrid.append(renderImageThumb(tab, item));
+      else els.galleryGrid.append(renderFolderItem(tab, item));
+    }
+  }
+
+  function renderImageThumb(tab, item) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "thumb";
+    const img = document.createElement("img");
+    img.src = mediaUrl(tab.short, item.name);
+    img.alt = item.name.split("/").pop();
+    const meta = document.createElement("div");
+    meta.className = "thumb-meta";
+    const label = document.createElement("span");
+    label.textContent = item.name.split("/").pop();
+    meta.append(label);
+    appendReviewBadge(meta, tab.short, item.name);
+    addQuickReview(meta, tab.short, item.name);
+    btn.append(img, meta);
+    btn.onclick = (event) => {
+      if (event.target.closest(".quick-rev")) return;
+      openMedia(tab.short, item.name, "image").catch((err) => showBanner(err.message, "warn", 5));
+    };
+    return btn;
+  }
+
+  function renderFolderItem(tab, item) {
+    const row = document.createElement("div");
+    row.className = "folder-item";
+    const head = document.createElement("div");
+    head.className = "folder-item-head";
+    const name = document.createElement("button");
+    name.type = "button";
+    name.className = "name";
+    name.textContent = item.name.split("/").pop();
+    name.onclick = () => openListedFile(tab.short, item);
+    head.append(name);
+    appendReviewBadge(head, tab.short, item.name);
+    addQuickReview(head, tab.short, item.name);
+    row.append(head);
+    if (item.kind === "audio") {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.preload = "metadata";
+      audio.src = mediaUrl(tab.short, item.name);
+      audio.setAttribute("data-file", item.name);
+      row.append(audio);
+    } else if (item.kind === "video") {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.src = mediaUrl(tab.short, item.name);
+      row.append(video);
+    }
+    return row;
+  }
+
+  function renderPlaylistRow(tab, item) {
+    const row = document.createElement("div");
+    row.className = "playlist-row";
+    const name = document.createElement("button");
+    name.type = "button";
+    name.className = "name";
+    name.textContent = item.name.split("/").pop();
+    name.onclick = () => openListedFile(tab.short, item);
+    row.append(name);
+    appendReviewBadge(row, tab.short, item.name);
+    if (item.kind === "audio") {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.preload = "metadata";
+      audio.src = mediaUrl(tab.short, item.name);
+      audio.setAttribute("data-file", item.name);
+      row.append(audio);
+    } else if (item.kind === "video") {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.src = mediaUrl(tab.short, item.name);
+      row.append(video);
+    }
+    addQuickReview(row, tab.short, item.name);
+    return row;
+  }
+
+  async function openInfo(short, file, opts) {
+    state.expanded.add(short);
+    let tab = state.tabs.find((item) => item.kind === "other" && item.short === short && item.file === file);
+    const meta = findMeta(short, file);
+    if (!tab) {
+      tab = {
+        kind: "other",
+        short,
+        file,
+        mtime: meta ? meta.mtime : 0,
+        size: meta ? meta.size : 0,
+      };
+      state.tabs.push(tab);
+    } else if (meta) {
+      tab.mtime = meta.mtime;
+      tab.size = meta.size;
+    }
+    if (!(opts && opts.restore)) {
+      activate(tab);
+      renderSidebar();
+    }
+    persistTabs();
+  }
+
+  function renderInfo(tab) {
+    const meta = findMeta(tab.short, tab.file) || tab;
+    els.infoName.textContent = tab.file.split("/").pop();
+    els.infoPath.textContent = tab.short + "/" + tab.file;
+    els.infoSize.textContent = formatSize(meta.size);
+    els.infoMtime.textContent = meta.mtime ? formatWhen(meta.mtime) : "";
   }
 
   function applyImageZoom(tab) {
@@ -1739,10 +2320,92 @@
   function refreshGallery(tab) {
     const folder = state.shorts.find((item) => item.name === tab.short);
     if (!folder) return;
-    const live = galleryImages(tab.short, tab.file);
-    if (sameImages(live, tab.images || [])) return;
-    tab.images = live;
+    const live = galleryFiles(tab.short, tab.file);
+    if (sameFiles(live, tab.files || [])) return;
+    tab.files = live;
+    tab.images = live.filter((item) => item.kind === "image");
     if (state.active === tab) renderGallery(tab);
+  }
+
+  function refreshInfo(tab) {
+    const meta = findMeta(tab.short, tab.file);
+    if (!meta) return;
+    if (meta.mtime === tab.mtime && meta.size === tab.size) return;
+    tab.mtime = meta.mtime;
+    tab.size = meta.size;
+    if (state.active === tab) renderInfo(tab);
+  }
+
+  function fileTabActive() {
+    const tab = state.active;
+    return Boolean(tab && tab.kind && tab.kind !== "gallery");
+  }
+
+  function syncReviewBar() {
+    const tab = state.active;
+    const show = fileTabActive();
+    els.reviewBar.hidden = !show;
+    if (!show) return;
+    if (state.reviewDraftDirty) return;
+    const review = reviewOf(tab.short, tab.file);
+    const verdict = review ? review.verdict : "";
+    els.reviewYes.classList.toggle("on", verdict === "yes");
+    els.reviewNo.classList.toggle("on", verdict === "no");
+    els.reviewNote.value = review ? review.note : "";
+    if (review && review.updatedAt) {
+      const ms = Date.parse(review.updatedAt);
+      els.reviewWhen.textContent = Number.isFinite(ms) ? formatWhen(ms) : review.updatedAt;
+    } else {
+      els.reviewWhen.textContent = "";
+    }
+  }
+
+  async function saveReviewFor(short, file, verdict, note) {
+    const path = reviewKey(short, file);
+    const data = await api("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, verdict, note: note || "" }),
+    });
+    if (data && data.path) state.reviews[data.path] = data.review;
+    state.reviewDraftDirty = false;
+    renderSidebar();
+    if (state.active && state.active.kind === "gallery") renderGallery(state.active);
+    else syncReviewBar();
+    return data;
+  }
+
+  async function clearReviewFor(short, file) {
+    const path = reviewKey(short, file);
+    await api("/api/reviews?path=" + encodeURIComponent(path), { method: "DELETE" });
+    delete state.reviews[path];
+    state.reviewDraftDirty = false;
+    renderSidebar();
+    if (state.active && state.active.kind === "gallery") renderGallery(state.active);
+    else syncReviewBar();
+  }
+
+  async function saveActiveReview() {
+    const tab = state.active;
+    if (!fileTabActive()) return;
+    const verdict = els.reviewYes.classList.contains("on") ? "yes" : els.reviewNo.classList.contains("on") ? "no" : "";
+    if (!verdict) {
+      showBanner("Pick Yes or No before saving a review.", "warn", 4);
+      return;
+    }
+    await saveReviewFor(tab.short, tab.file, verdict, els.reviewNote.value);
+    showBanner("Review saved", "ok", 2);
+  }
+
+  async function clearActiveReview() {
+    const tab = state.active;
+    if (!fileTabActive()) return;
+    await clearReviewFor(tab.short, tab.file);
+    els.reviewYes.classList.remove("on");
+    els.reviewNo.classList.remove("on");
+    els.reviewNote.value = "";
+    els.reviewWhen.textContent = "";
+    showBanner("Review cleared", "ok", 2);
   }
 
   async function refreshReview(tab) {
@@ -1757,11 +2420,9 @@
   }
 
   async function openAnything(short, file) {
-    const kind = inferMediaKind(file);
-    const lower = String(file || "").toLowerCase();
-    if (lower.endsWith(".wav") || lower.endsWith(".mp3") || lower.endsWith(".mp4") || /\.(png|jpe?g|webp)$/.test(lower)) {
-      return openMedia(short, file, kind);
-    }
+    const kind = inferKind(file);
+    if (kind === "audio" || kind === "video" || kind === "image") return openMedia(short, file, kind);
+    if (kind === "other") return openInfo(short, file);
     return openText(short, file);
   }
 
@@ -1771,7 +2432,7 @@
 
   async function openReview(loc) {
     if (loc.kind === "gallery") {
-      await openGallery(loc.short, loc.file || "", loc.images);
+      await openGallery(loc.short, loc.file || "", loc.images, { files: loc.files });
       return;
     }
     const match = /^(.*\.(wav|mp3|mp4|png|jpg|jpeg|webp))\.review\.md$/i.exec(loc.file);
@@ -1781,6 +2442,8 @@
     }
     if (loc.kind === "audio" || loc.kind === "video" || loc.kind === "image") {
       await openMedia(loc.short, loc.file, loc.kind);
+    } else if (loc.kind === "other") {
+      await openInfo(loc.short, loc.file);
     } else await openText(loc.short, loc.file);
   }
 
@@ -1823,14 +2486,21 @@
   }
 
   async function poll() {
-    const [tree, control] = await Promise.all([api("/api/shorts"), api("/api/control")]);
+    const [tree, control, reviewData] = await Promise.all([
+      api("/api/shorts"),
+      api("/api/control"),
+      api("/api/reviews").catch(() => ({ reviews: {} })),
+    ]);
     state.root = tree.root || "";
     state.shorts = tree.shorts || [];
+    state.reviews = (reviewData && reviewData.reviews) || {};
     state.status = tree.missing ? "SHORTS_ROOT does not exist" : "Updated " + new Date().toLocaleTimeString();
-    const sig = JSON.stringify(state.shorts);
+    const sig = JSON.stringify({ shorts: state.shorts, reviews: state.reviews, filters: state.filters, unreviewedOnly: state.unreviewedOnly });
     if (sig !== state.treeSig) {
       state.treeSig = sig;
       renderSidebar();
+      if (state.active && state.active.kind === "gallery") renderGallery(state.active);
+      else syncReviewBar();
     } else {
       els.rootLabel.textContent = state.root;
       els.status.textContent = state.status;
@@ -1838,6 +2508,7 @@
     for (const tab of state.tabs.slice()) {
       if (tab.kind === "text") await refreshText(tab);
       else if (tab.kind === "gallery") refreshGallery(tab);
+      else if (tab.kind === "other") refreshInfo(tab);
       else await refreshReview(tab);
     }
     await applyControl(control);
@@ -1896,7 +2567,7 @@
     if (!rec || typeof rec !== "object") return false;
     if (typeof rec.short !== "string" || rec.short.length === 0) return false;
     if (typeof rec.file !== "string") return false;
-    if (rec.kind !== "text" && rec.kind !== "audio" && rec.kind !== "video" && rec.kind !== "image" && rec.kind !== "gallery") return false;
+    if (rec.kind !== "text" && rec.kind !== "audio" && rec.kind !== "video" && rec.kind !== "image" && rec.kind !== "gallery" && rec.kind !== "other") return false;
     if (rec.kind !== "gallery" && rec.file.length === 0) return false;
     return true;
   }
@@ -1917,11 +2588,12 @@
     if (!loc || loc.short !== rec.short || (loc.file || "") !== (rec.file || "")) return "missing";
     if (rec.kind === "gallery") {
       if (loc.kind !== "gallery") return "missing";
-      await openGallery(loc.short, loc.file || "", loc.images, { restore: true });
+      await openGallery(loc.short, loc.file || "", loc.images, { restore: true, files: loc.files });
       return "opened";
     }
     if (loc.kind !== rec.kind) return "missing";
     if (rec.kind === "text") await openText(rec.short, rec.file, { restore: true, mdView: rec.mdView });
+    else if (rec.kind === "other") await openInfo(rec.short, rec.file, { restore: true });
     else await openMedia(rec.short, rec.file, rec.kind, { restore: true });
     return "opened";
   }
@@ -1964,6 +2636,7 @@
   }
 
   async function boot() {
+    loadFilters();
     const baseline = api("/api/control").then((control) => {
       state.lastSeq = Number(control && control.seq) || 0;
     }).catch(() => {});
@@ -2002,6 +2675,39 @@
   els.keepMine.addEventListener("click", keepMine);
   els.readyDismiss.addEventListener("click", () => { els.ready.hidden = true; });
   els.noteForm.addEventListener("submit", (event) => addNote(event).catch((err) => showBanner(err.message, "warn", 5)));
+  els.filters.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-filter]");
+    if (!btn || !els.filters.contains(btn)) return;
+    const key = btn.dataset.filter;
+    if (!Object.prototype.hasOwnProperty.call(state.filters, key)) return;
+    state.filters[key] = !state.filters[key];
+    persistFilters();
+    syncFilterChrome();
+    renderSidebar();
+  });
+  els.unreviewedOnly.addEventListener("change", () => {
+    state.unreviewedOnly = Boolean(els.unreviewedOnly.checked);
+    persistFilters();
+    renderSidebar();
+  });
+  els.reviewYes.addEventListener("click", () => {
+    els.reviewYes.classList.add("on");
+    els.reviewNo.classList.remove("on");
+    state.reviewDraftDirty = true;
+  });
+  els.reviewNo.addEventListener("click", () => {
+    els.reviewNo.classList.add("on");
+    els.reviewYes.classList.remove("on");
+    state.reviewDraftDirty = true;
+  });
+  els.reviewNote.addEventListener("input", () => { state.reviewDraftDirty = true; });
+  els.reviewSave.addEventListener("click", () => saveActiveReview().catch((err) => showBanner(err.message, "warn", 5)));
+  els.reviewClear.addEventListener("click", () => clearActiveReview().catch((err) => showBanner(err.message, "warn", 5)));
+  els.playAllBtn.addEventListener("click", () => {
+    const tab = state.active;
+    if (!tab || tab.kind !== "gallery") return;
+    startPlayAll(tab);
+  });
   els.imageWrap.addEventListener("click", (event) => {
     const tab = state.active;
     if (!tab || tab.kind !== "image") return;

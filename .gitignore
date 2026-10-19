@@ -5,6 +5,8 @@ _backup_prev_attempt/
 *.err
 control.json
 control.json.bak*
+reviews.json
+reviews.json.tmp
 
 # Local-only config (copy the *.example.json files)
 .mcp.json

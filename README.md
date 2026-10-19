@@ -4,15 +4,19 @@ A local review studio for creators who work with AI agents. Agents (Grok Bot or 
 
 It is one small Node server (no framework, no build step), one static page, and an MCP stdio server. Agents drive the page through a tiny `control.json` protocol: bump `seq`, list commands, and the page opens the file, jumps to a line, or shows a "Ready for review" banner.
 
+A `CHANGELOG.md` is maintained with every change.
+
 What it does:
 
 - Edits `.md` and `.txt` with line numbers, backups before every save, and conflict detection.
 - Renders markdown with Preview, Edit, and Split views.
-- Plays audio with a waveform, plays video (9:16 friendly), and shows images and image galleries.
-- Stores review notes as plain markdown next to each media file (`<media file>.review.md`).
+- Plays audio with a waveform, plays video (9:16 friendly), and shows images and folder views of every file type.
+- Filters the sidebar by Video, Audio, Image, Text, and Other, and can hide files that already have a review.
+- Stores a yes/no review (with an optional note and timestamp) for any file in `reviews.json`.
+- Stores timestamped media notes as plain markdown next to each media file (`<media file>.review.md`).
 - Live-reloads files that agents change and highlights what changed.
 
-Audio, video, and images are read-only. The only file written from a media tab is `<media file>.review.md` next to that media.
+Audio, video, and images are read-only. Timestamped notes from a media tab still write `<media file>.review.md`. Yes/no file reviews write `reviews.json`.
 
 ## Setup
 
@@ -50,10 +54,11 @@ The root is resolved in this order:
 | `PORT` | `5178` |
 | `SHORTS_ROOT` | `studio.config.json` root, else `./workspace` |
 | `CONTROL_PATH` | `control.json` in this folder |
+| `REVIEWS_PATH` | `reviews.json` in this folder |
 
 The server listens on `127.0.0.1` and `::1` only.
 
-`control.json` is created at runtime and gitignored. `control.example.json` shows the empty starting state.
+`control.json` and `reviews.json` are created at runtime and gitignored. `control.example.json` shows the empty starting state.
 
 ## Paths
 
@@ -62,11 +67,13 @@ The server listens on `127.0.0.1` and `::1` only.
 | Projects | `<root>/<short>/` |
 | Text | `.md` and `.txt`, including files in subfolders |
 | Media | `.wav`, `.mp3`, `.mp4`, `.png`, `.jpg`, `.jpeg`, `.webp` in the project, including subfolders such as `clips/`, `vo/`, and `art/` |
+| Other | any other file type, listed with `kind` `"other"` |
 | Backups | `<short>/.studio_backups/<filename>.<YYYYMMDD-HHMMSS>.bak` |
-| Review notes | next to the media, e.g. `vo/take3.wav.review.md` |
+| Media notes | next to the media, e.g. `vo/take3.wav.review.md` |
+| File reviews | `reviews.json` in this folder (`verdict`, `note`, `updatedAt`, keyed by `short/file`) |
 | Viewer commands | `control.json` in this folder |
 
-Hidden folders (names starting with `.`) are not listed. That keeps `.studio_backups` out of the sidebar. Other file types are ignored.
+Hidden folders (names starting with `.`) are not listed. That keeps `.studio_backups` out of the sidebar. Unknown file types are listed as Other.
 
 Nested text backups use the relative path with slashes turned into `__`:
 `vo/take3.wav.review.md` becomes `.studio_backups/vo__take3.wav.review.md.<stamp>.bak`.
@@ -74,7 +81,7 @@ Nested text backups use the relative path with slashes turned into `__`:
 Projects are ordered by the newest `.md` or `.txt` modification time. A folder with only media sorts last.
 ## Page
 
-The sidebar lists projects, newest first. Expand one to see **Text** and **Media**. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab. Drag a tab to reorder it. Close with ×. A dot on a tab means unsaved text edits.
+The sidebar lists projects, newest first. Toggle chips filter **Video**, **Audio**, **Image**, **Text**, and **Other** (stored in `localStorage` as `studio.fileFilters`). **Unreviewed only** hides files that already have a yes/no review (`studio.unreviewedOnly`). Click the caret to expand a project. Click the project name (or a nested folder name) to open a folder view. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab. Drag a tab to reorder it. Close with ×. A dot on a tab means unsaved text edits. A green ✓ or red ✕ on a file is its review verdict; hover for the note.
 
 Text tabs are a textarea with line numbers. **Save** and Ctrl+S write the file. Before every save the server copies the current file into `.studio_backups`. The save sends the hash from when the tab was loaded. If the file changed on disk, the server returns 409 and does not overwrite.
 
@@ -88,7 +95,8 @@ Open tabs are remembered in this browser. Close the page and open it again, and 
   "tabs": [
     { "short": "my-short", "file": "script_v1.md", "kind": "text", "mdView": "split" },
     { "short": "my-short", "file": "vo/take3.wav", "kind": "audio" },
-    { "short": "my-short", "file": "art", "kind": "gallery" }
+    { "short": "my-short", "file": "art", "kind": "gallery" },
+    { "short": "my-short", "file": "notes.json", "kind": "other" }
   ]
 }
 ```
@@ -106,7 +114,13 @@ Audio tabs show a player and a waveform drawn with the Web Audio API. Click the 
 
 Image tabs (`.png`, `.jpg`, `.jpeg`, `.webp`) fit the picture to the stage. Click the picture to show it at 100% (one image pixel per CSS pixel). Scroll to pan when it is larger than the stage. Click again to fit.
 
-A folder path opens a gallery tab: a grid of the images directly in that folder (not images in nested folders). Click a thumbnail to open that image.
+A folder path opens a folder view of every file sitting directly in that folder (not nested folders). Images are thumbnails (click to open the image tab). Audio files get an inline player. Video files get an inline `<video>` player. `.md` and `.txt` names open a text tab. Other files open a small info view (name, size, modified time). Each item shows its review badge and Yes / No buttons.
+
+When most files in the folder are audio, the view is a playlist: rows ordered by name, each with the file name, an inline player, a review badge, and Yes / No. **Play all** plays each audio file top to bottom and advances on `ended`.
+
+Unknown types open an info view instead of the editor. `/media` still refuses them.
+
+Every file tab (text, media, or other) has a review bar: **Yes** / **No**, a note field, **Save**, **Clear**, and the last-saved timestamp. This is separate from `<media file>.review.md` timestamped notes.
 
 On an audio or video tab, **Add note @ 0:12** appends a line to `<media file>.review.md`:
 
@@ -138,17 +152,20 @@ All JSON. Errors are `{ "error": "..." }` with an HTTP status. A conflict also i
       "name": "my-short",
       "mtime": 1710000000000,
       "text": [{ "name": "script_v1.md", "mtime": 1710000000000, "size": 4539 }],
-      "media": [{ "name": "vo/take3.wav", "mtime": 1710000000000, "size": 658732, "kind": "audio" }]
+      "media": [
+        { "name": "vo/take3.wav", "mtime": 1710000000000, "size": 658732, "kind": "audio" },
+        { "name": "notes.json", "mtime": 1710000000000, "size": 120, "kind": "other" }
+      ]
     }
   ]
 }
 ```
 
-`mtime` on a project is the latest text file time, or `0` when it has no text files. `kind` is `audio`, `video`, or `image`.
+`mtime` on a project is the latest text file time, or `0` when it has no text files. `kind` on media is `audio`, `video`, `image`, or `other`.
 
 ### `GET /api/files?short=my-short`
 
-`{ "short", "mtime", "text", "media" }` for one project.
+`{ "short", "mtime", "text", "media" }` for one project. Unknown types are in `media` with `kind` `"other"`.
 
 ### `GET /api/file?short=my-short&file=script_v1.md`
 
@@ -188,7 +205,53 @@ Returns `control.json`: `{ "seq": 0, "commands": [] }`.
 
 ### `GET /api/resolve?path=`
 
-`path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. A trailing slash is allowed on a folder. Response: `{ short, file, kind, mtime, size }`. `kind` is `text`, `audio`, `video`, `image`, or `gallery`. For a gallery, `file` is the folder path inside the project (empty when `path` is the project folder itself) and `images` lists `{ name, mtime, size, kind }` for images directly in that folder. Paths that escape the root are **400**.
+`path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. A trailing slash is allowed on a folder. Response: `{ short, file, kind, mtime, size }`. `kind` is `text`, `audio`, `video`, `image`, `other`, or `gallery`. For a gallery, `file` is the folder path inside the project (empty when `path` is the project folder itself), `images` lists `{ name, mtime, size, kind }` for images directly in that folder (backward compatible), and `files` lists every file directly in that folder with a `kind`. Paths that escape the root are **400**.
+
+### `GET /api/reviews`
+
+```sh
+curl http://localhost:5178/api/reviews
+```
+
+```json
+{
+  "reviews": {
+    "my-short/vo/line01.wav": {
+      "verdict": "yes",
+      "note": "keep this take",
+      "updatedAt": "2026-04-08T15:02:11.000Z"
+    }
+  }
+}
+```
+
+Keys are paths relative to `SHORTS_ROOT` with forward slashes (`<short>/<file>`).
+
+### `GET /api/reviews?path=`
+
+```sh
+curl "http://localhost:5178/api/reviews?path=my-short/vo/line01.wav"
+```
+
+Returns `{ "path": "my-short/vo/line01.wav", "review": { ... } }`. `review` is `null` when none is stored. The file must exist inside `SHORTS_ROOT`.
+
+### `POST /api/reviews`
+
+```sh
+curl -X POST http://localhost:5178/api/reviews -H "Content-Type: application/json" -d "{\"path\":\"my-short/vo/line01.wav\",\"verdict\":\"yes\",\"note\":\"keep this take\"}"
+```
+
+`verdict` is `"yes"` or `"no"`. `note` is optional free text. Writes `reviews.json` atomically (temp file + rename) and serializes writes. Response: `{ "path", "review" }`.
+
+Clear with `{ "path": "my-short/vo/line01.wav", "clear": true }` or with DELETE.
+
+### `DELETE /api/reviews?path=`
+
+```sh
+curl -X DELETE "http://localhost:5178/api/reviews?path=my-short/vo/line01.wav"
+```
+
+Removes that review. Response: `{ "path": "my-short/vo/line01.wav", "review": null }`.
 
 ### `GET /media?short=&file=`
 
@@ -213,13 +276,13 @@ This is how agents drive the page. The page polls this file every 1.5 seconds. I
 
 | Action | Fields | Effect |
 | --- | --- | --- |
-| `open` | `short`, `file` | Open or focus a tab. `.wav` and `.mp3` open as audio, `.mp4` as video, `.png` `.jpg` `.jpeg` `.webp` as image, anything else as text. |
+| `open` | `short`, `file` | Open or focus a tab. `.wav` and `.mp3` open as audio, `.mp4` as video, `.png` `.jpg` `.jpeg` `.webp` as image, `.md` and `.txt` as text, anything else as an info view. |
 | `close` | `short`, `file` | Close matching tabs. |
 | `closeAll` | | Close every tab. |
 | `goto` | `short`, `file`, `line`, `highlight` | Open the text file, scroll to the 1-based line. Highlights the line unless `highlight` is false. |
 | `banner` | `text`, `level`, `timeoutSec` | Toast. `level` is `info`, `warn`, or `ok`. Default timeout is 8 seconds. |
-| `open_review` | `path`, `note` | Open a review tab. `path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. An image opens an image tab. A folder opens a gallery tab. Shows `note` as a normal banner. A `*.wav.review.md` (or mp3/mp4/png/jpg/jpeg/webp) path opens the media file instead. |
-| `notify_ready` | `path`, `kind`, `note` | Open that review tab (file, image, or gallery folder) and show a prominent **Ready for review** banner until dismissed. `kind` is `audio`, `short`, or `image`. |
+| `open_review` | `path`, `note` | Open a review tab. `path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. An image opens an image tab. A folder opens a folder view of every file in that folder. Shows `note` as a normal banner. A `*.wav.review.md` (or mp3/mp4/png/jpg/jpeg/webp) path opens the media file instead. |
+| `notify_ready` | `path`, `kind`, `note` | Open that review tab (file, image, or folder) and show a prominent **Ready for review** banner until dismissed. `kind` is `audio`, `short`, or `image`. |
 ## MCP
 
 `mcp.js` is a stdio MCP server, so agents can list, read, and edit workspace files and push things to your screen. It uses `@modelcontextprotocol/sdk` and `zod` from the local `node_modules`. Do not print to stdout from this process.
@@ -229,13 +292,17 @@ Tools:
 | Tool | Role |
 | --- | --- |
 | `list_shorts` | Same listing as `GET /api/shorts`. |
-| `list_files` | `{ short }` |
+| `list_files` | `{ short }`. Includes unknown types in `media` with `kind` `"other"`. |
 | `read_file` | `{ short, file }` content, mtime, hash. Exact text, including newlines. |
 | `write_file` | `{ short, file, content }` backup, then write. No hash check. |
 | `replace_lines` | `{ short, file, startLine, endLine, newText }` backup, then replace a 1-based inclusive range. Keeps the file's newline style. Empty `newText` deletes the range. |
 | `control` | `{ commands }` bumps `seq` and writes `control.json`. |
-| `open_review` | `{ path, note }` writes one `open_review` command. `path` may be an image or a folder of images. |
-| `notify_ready` | `{ path, kind, note }` writes one `notify_ready` command. `path` may be an image or a folder. `kind` is `audio`, `short`, or `image`. |
+| `open_review` | `{ path, note }` writes one `open_review` command. `path` may be a file or a folder. |
+| `notify_ready` | `{ path, kind, note }` writes one `notify_ready` command. `path` may be a file or a folder. `kind` is `audio`, `short`, or `image`. |
+| `get_reviews` | Optional `{ short }` or `{ prefix }` filter. Returns all matching reviews. |
+| `get_review` | `{ path }` for one file (`my-short/vo/line01.wav`). `review` is null when none is stored. |
+| `set_review` | `{ path, verdict, note }` records yes/no plus an optional note. |
+| `clear_review` | `{ path }` removes that review. |
 
 To register it, copy `.mcp.example.json` to `.mcp.json` (gitignored) and fill in your paths:
 
@@ -262,7 +329,9 @@ Shared file rules live in `studio-lib.js`. The HTTP routes live in `server.js`. 
 
 - New text type: add the extension to `TEXT_EXT` in `studio-lib.js`.
 - Markdown preview: `vendor/marked.umd.js` is served from `server.js` at `/vendor/marked.umd.js`. Preview / Edit / Split live in `index.html`. `.txt` does not use them.
-- New audio, video, or image type: add it to `AUDIO_EXT`, `VIDEO_EXT`, or `IMAGE_EXT`, and to `mimeFor`. In `index.html`, teach `openAnything` and the `*.review.md` pattern the extension. Range streaming already follows `mimeFor`.
+- New audio, video, or image type: add it to `AUDIO_EXT`, `VIDEO_EXT`, or `IMAGE_EXT`, and to `mimeFor`. In `index.html`, teach `openAnything` and the `*.review.md` pattern the extension. Range streaming already follows `mimeFor`. Unknown extensions are listed as `other` and open the info view.
+- File reviews: `readReviews` / `setReview` / `clearReview` in `studio-lib.js`, `reviews.json` (override with `REVIEWS_PATH`).
+- Sidebar filters: `studio.fileFilters` and `studio.unreviewedOnly` in `localStorage`.
 - New API route: add a branch in `route()` in `server.js`. Throw `StudioError(status, message)` for a JSON error.
 - New viewer action: handle `cmd.action` in `runCommand` in `index.html`. `control` already passes extra fields through.
 - New MCP tool: `server.registerTool` in `mcp.js`, and call a function in `studio-lib.js` so the backup and path checks stay in one place.

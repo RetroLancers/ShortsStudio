@@ -202,22 +202,31 @@ async function route(req, res) {
     await serveMedia(req, res, requireQuery(url, "short"), requireQuery(url, "file"));
     return;
   }
-  if (req.method !== "GET" && !(req.method === "PUT" && pathName === "/api/file")) {
+  if (pathName === "/api/reviews") {
+    if (req.method === "GET") {
+      const reviewPath = url.searchParams.get("path");
+      if (reviewPath == null || reviewPath === "") {
+        sendJson(res, 200, await lib.readReviews());
+        return;
+      }
+      sendJson(res, 200, await lib.getReview(reviewPath));
+      return;
+    }
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      if (typeof body.path !== "string") throw new lib.StudioError(400, "path is required");
+      if (body.clear === true) {
+        sendJson(res, 200, await lib.clearReview(body.path));
+        return;
+      }
+      sendJson(res, 200, await lib.setReview(body.path, body.verdict, body.note));
+      return;
+    }
+    if (req.method === "DELETE") {
+      sendJson(res, 200, await lib.clearReview(requireQuery(url, "path")));
+      return;
+    }
     throw new lib.StudioError(405, "Method not allowed");
-  }
-  if (pathName === "/api/shorts") {
-    sendJson(res, 200, await lib.listShorts());
-    return;
-  }
-  if (pathName === "/api/files") {
-    sendJson(res, 200, await lib.listFiles(requireQuery(url, "short")));
-    return;
-  }
-  if (pathName === "/api/file" && req.method === "GET") {
-    const data = await lib.readText(requireQuery(url, "short"), requireQuery(url, "file"));
-    delete data.raw;
-    sendJson(res, 200, data);
-    return;
   }
   if (pathName === "/api/file" && req.method === "PUT") {
     const body = await readBody(req);
@@ -232,6 +241,23 @@ async function route(req, res) {
       eol: body.eol,
     });
     sendJson(res, 200, saved);
+    return;
+  }
+  if (req.method !== "GET") {
+    throw new lib.StudioError(405, "Method not allowed");
+  }
+  if (pathName === "/api/shorts") {
+    sendJson(res, 200, await lib.listShorts());
+    return;
+  }
+  if (pathName === "/api/files") {
+    sendJson(res, 200, await lib.listFiles(requireQuery(url, "short")));
+    return;
+  }
+  if (pathName === "/api/file") {
+    const data = await lib.readText(requireQuery(url, "short"), requireQuery(url, "file"));
+    delete data.raw;
+    sendJson(res, 200, data);
     return;
   }
   if (pathName === "/api/control") {

@@ -43,7 +43,7 @@ function register(server) {
     {
       title: "List shorts",
       description:
-        "List short folders under SHORTS_ROOT, newest .md/.txt change first. Each entry includes text and media files.",
+        "List short folders under SHORTS_ROOT, newest .md/.txt change first. Each entry includes text and media files. Unknown types appear in media with kind \"other\".",
       annotations: { readOnlyHint: true },
     },
     async () => run(() => lib.listShorts())
@@ -54,7 +54,7 @@ function register(server) {
     {
       title: "List files in a short",
       description:
-        "List .md/.txt files and .wav/.mp3/.mp4/.png/.jpg/.jpeg/.webp files inside one short. Paths are relative to the short folder. .studio_backups is hidden.",
+        "List .md/.txt files, media (.wav/.mp3/.mp4/.png/.jpg/.jpeg/.webp), and other files inside one short. Unknown types appear in media with kind \"other\". Paths are relative to the short folder. .studio_backups is hidden.",
       inputSchema: {
         short: z.string().describe("Short folder name"),
       },
@@ -134,7 +134,7 @@ function register(server) {
     {
       title: "Open a review tab",
       description:
-        "Validate a file or folder inside SHORTS_ROOT, then write control.json so the studio opens it and shows a banner with the note. path is short/file, a folder such as short/art, or an absolute path inside SHORTS_ROOT. An image opens an image tab. A folder opens a gallery of the images in that folder.",
+        "Validate a file or folder inside SHORTS_ROOT, then write control.json so the studio opens it and shows a banner with the note. path is short/file, a folder such as short/art, or an absolute path inside SHORTS_ROOT. An image opens an image tab. A folder opens a view of every file directly in that folder.",
       inputSchema: {
         path: z.string().describe("short/file, short/folder, or an absolute path inside SHORTS_ROOT"),
         note: z.string().optional().describe("Banner text"),
@@ -154,7 +154,7 @@ function register(server) {
     {
       title: "Notify ready for review",
       description:
-        "Open a file, image, or image folder in a review tab and show a prominent Ready for review banner. A folder opens a gallery. kind is audio, short, or image. Writes control.json.",
+        "Open a file, image, or folder in a review tab and show a prominent Ready for review banner. A folder opens a view of every file in that folder. kind is audio, short, or image. Writes control.json.",
       inputSchema: {
         path: z.string().describe("short/file, short/folder, or an absolute path inside SHORTS_ROOT"),
         kind: z.enum(["audio", "short", "image"]).describe("audio, short, or image"),
@@ -168,6 +168,62 @@ function register(server) {
           { action: "notify_ready", path: filePath, kind, note: note || "" },
         ]);
       })
+  );
+
+  server.registerTool(
+    "get_reviews",
+    {
+      title: "List file reviews",
+      description:
+        "Return review status for files (verdict yes/no, note, updatedAt). Optional short or prefix filters keys relative to SHORTS_ROOT (forward slashes, for example my-short or my-short/vo).",
+      inputSchema: {
+        short: z.string().optional().describe("Only reviews whose path starts with this short folder"),
+        prefix: z.string().optional().describe("Only reviews whose path equals this prefix or is under it"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ short, prefix }) => run(() => lib.readReviews({ short, prefix }))
+  );
+
+  server.registerTool(
+    "get_review",
+    {
+      title: "Get one file review",
+      description:
+        "Return { path, review } for one file. path is short/file using forward slashes. review is null when none is stored. The file must exist inside SHORTS_ROOT.",
+      inputSchema: {
+        path: z.string().describe("short/file, for example my-short/vo/line01.wav"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path: filePath }) => run(() => lib.getReview(filePath))
+  );
+
+  server.registerTool(
+    "set_review",
+    {
+      title: "Set a file review",
+      description:
+        "Record a review for an existing file. path is short/file. verdict is yes or no. note is optional free text. Writes reviews.json.",
+      inputSchema: {
+        path: z.string().describe("short/file, for example my-short/vo/line01.wav"),
+        verdict: z.enum(["yes", "no"]).describe("yes or no"),
+        note: z.string().optional().describe("Free-text note"),
+      },
+    },
+    async ({ path: filePath, verdict, note }) => run(() => lib.setReview(filePath, verdict, note || ""))
+  );
+
+  server.registerTool(
+    "clear_review",
+    {
+      title: "Clear a file review",
+      description: "Remove the stored review for an existing file. path is short/file using forward slashes.",
+      inputSchema: {
+        path: z.string().describe("short/file, for example my-short/vo/line01.wav"),
+      },
+    },
+    async ({ path: filePath }) => run(() => lib.clearReview(filePath))
   );
 }
 

@@ -1,9 +1,10 @@
 // Shared by server.js and mcp.js.
 // Text files (.md, .txt) can be saved. Each save copies the current file into
 // <short>/.studio_backups/ first. Media (audio, video, images) is read-only.
-// The only media-mode write is <mediafile>.review.md, a normal text file next
-// to the media. Add an extension to TEXT_EXT / AUDIO_EXT / VIDEO_EXT / IMAGE_EXT
-// to support a new type.
+// Unknown types are listed with kind "other". The only media-mode write is
+// <mediafile>.review.md, a normal text file next to the media. File review
+// status (yes/no + note) lives in reviews.json. Add an extension to TEXT_EXT /
+// AUDIO_EXT / VIDEO_EXT / IMAGE_EXT to support a new type.
 
 const fs = require("fs");
 const fsp = require("fs/promises");
@@ -56,6 +57,10 @@ function controlPath() {
   return path.resolve(process.env.CONTROL_PATH || path.join(STUDIO_DIR, "control.json"));
 }
 
+function reviewsPath() {
+  return path.resolve(process.env.REVIEWS_PATH || path.join(STUDIO_DIR, "reviews.json"));
+}
+
 function ensureInside(root, target) {
   const rel = path.relative(path.resolve(root), path.resolve(target));
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
@@ -81,7 +86,7 @@ function kindFor(fileName) {
   if (AUDIO_EXT.has(ext)) return "audio";
   if (VIDEO_EXT.has(ext)) return "video";
   if (IMAGE_EXT.has(ext)) return "image";
-  return null;
+  return "other";
 }
 
 function mimeFor(fileName) {
@@ -103,7 +108,7 @@ function resolveShortDir(short) {
 }
 
 // file is a relative path inside the short, using / or \ separators.
-// allow: "text" | "media" | "known"
+// allow: "text" | "media" | "known" | "any"
 function resolveUserFile(short, file, allow) {
   const shortDir = resolveShortDir(short);
   if (typeof file !== "string" || file.length === 0 || file.length > 500) {
@@ -125,7 +130,7 @@ function resolveUserFile(short, file, allow) {
   if (allow === "media" && kind !== "audio" && kind !== "video" && kind !== "image") {
     throw new StudioError(400, "Not a media file");
   }
-  if (allow === "known" && !kind) throw new StudioError(400, "Unsupported file type");
+  if (allow === "known" && kind === "other") throw new StudioError(400, "Unsupported file type");
   return { abs, kind, rel: parts.join("/") };
 }
 
@@ -181,7 +186,6 @@ async function walkFiles(dir, rel, into) {
     }
     if (!ent.isFile()) continue;
     const kind = kindFor(ent.name);
-    if (!kind) continue;
     let stat;
     try {
       stat = await fsp.stat(abs);
@@ -436,7 +440,7 @@ async function replaceLines(short, file, startLine, endLine, newText) {
   });
 }
 
-async function listDirectImages(dirAbs, folderRel) {
+async function listDirectEntries(dirAbs, folderRel) {
   let entries;
   try {
     entries = await fsp.readdir(dirAbs, { withFileTypes: true });
@@ -446,11 +450,10 @@ async function listDirectImages(dirAbs, folderRel) {
     }
     throw err;
   }
-  const images = [];
+  const files = [];
   for (const ent of entries) {
     if (ent.name.startsWith(".")) continue;
     if (!ent.isFile()) continue;
-    if (kindFor(ent.name) !== "image") continue;
     const name = folderRel ? folderRel + "/" + ent.name : ent.name;
     let stat;
     try {
@@ -458,20 +461,24 @@ async function listDirectImages(dirAbs, folderRel) {
     } catch {
       continue;
     }
-    images.push({
+    files.push({
       name,
       mtime: Math.round(stat.mtimeMs),
       size: stat.size,
-      kind: "image",
+      kind: kindFor(ent.name),
     });
   }
-  images.sort((a, b) => a.name.localeCompare(b.name));
-  return images;
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  return files;
 }
 
-// A file path resolves as text, audio, video, or image.
+async function listDirectImages(dirAbs, folderRel) {
+  return (await listDirectEntries(dirAbs, folderRel)).filter((item) => item.kind === "image");
+}
+
+// A file path resolves as text, audio, video, image, or other.
 // A directory path (relative to SHORTS_ROOT, or absolute inside it) resolves
-// as a gallery of the images sitting directly in that folder.
+// as a gallery: images (backward compatible) plus files (every direct child).
 async function resolveInputPath(input) {
   if (typeof input !== "string" || input.trim() === "") {
     throw new StudioError(400, "path is required");
@@ -508,7 +515,8 @@ async function resolveInputPath(input) {
   const short = parts[0];
   if (stat.isDirectory()) {
     const folder = parts.slice(1).join("/");
-    const images = await listDirectImages(real, folder);
+    const files = await listDirectEntries(real, folder);
+    const images = files.filter((item) => item.kind === "image");
     return {
       short,
       file: folder,
@@ -517,6 +525,7 @@ async function resolveInputPath(input) {
       mtime: Math.round(stat.mtimeMs),
       size: stat.size,
       images,
+      files,
     };
   }
   if (hadSlash) throw new StudioError(400, "Path must be a file");
@@ -524,7 +533,6 @@ async function resolveInputPath(input) {
   if (parts.length < 2) throw new StudioError(400, "Path must be a file inside a short folder");
   const file = parts.slice(1).join("/");
   const kind = kindFor(parts[parts.length - 1]);
-  if (!kind) throw new StudioError(400, "Unsupported file type");
   return {
     short,
     file,
@@ -594,6 +602,162 @@ async function writeCommandsNow(commands) {
   return next;
 }
 
+function posixRelKey(input) {
+  if (typeof input !== "string" || input.trim() === "") {
+    throw new StudioError(400, "path is required");
+  }
+  const trimmed = input.trim().replace(/\\/g, "/");
+  if (path.isAbsolute(trimmed) || trimmed.startsWith("/")) {
+    throw new StudioError(400, "Invalid path");
+  }
+  const parts = trimmed.split("/").filter((p) => p.length > 0);
+  if (parts.length < 2) throw new StudioError(400, "Path must be a file inside a short folder");
+  if (parts.some((p) => p === "." || p === ".." || p.startsWith("."))) {
+    throw new StudioError(400, "Invalid path");
+  }
+  const short = parts[0];
+  const file = parts.slice(1).join("/");
+  const located = resolveUserFile(short, file, "any");
+  return { key: short + "/" + located.rel, short, file: located.rel, abs: located.abs, kind: located.kind };
+}
+
+async function assertExistingFile(abs) {
+  const real = await assertRealInside(abs);
+  let stat;
+  try {
+    stat = await fsp.stat(real);
+  } catch (err) {
+    if (err.code === "ENOENT") throw new StudioError(404, "File not found");
+    throw err;
+  }
+  if (!stat.isFile()) throw new StudioError(400, "Path must be a file");
+  return real;
+}
+
+function sanitizeReview(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (value.verdict !== "yes" && value.verdict !== "no") return null;
+  return {
+    verdict: value.verdict,
+    note: typeof value.note === "string" ? value.note : "",
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
+  };
+}
+
+function matchesReviewFilter(key, opts) {
+  if (!opts) return true;
+  if (opts.short != null && String(opts.short).trim() !== "") {
+    const name = String(opts.short).trim().replace(/\\/g, "/").replace(/\/+$/, "");
+    if (key !== name && !key.startsWith(name + "/")) return false;
+  }
+  if (opts.prefix != null && String(opts.prefix).trim() !== "") {
+    const prefix = String(opts.prefix).trim().replace(/\\/g, "/");
+    if (key !== prefix && !key.startsWith(prefix.endsWith("/") ? prefix : prefix + "/")) return false;
+  }
+  return true;
+}
+
+async function loadReviewMap() {
+  try {
+    const raw = await fsp.readFile(reviewsPath(), "utf8");
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new StudioError(500, "reviews.json is invalid JSON");
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new StudioError(500, "reviews.json must be an object");
+    }
+    const map = {};
+    for (const [key, value] of Object.entries(data)) {
+      const review = sanitizeReview(value);
+      if (review) map[key] = review;
+    }
+    return map;
+  } catch (err) {
+    if (err instanceof StudioError) throw err;
+    if (err.code === "ENOENT") return {};
+    throw err;
+  }
+}
+
+async function readReviews(opts) {
+  const map = await loadReviewMap();
+  const reviews = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (matchesReviewFilter(key, opts)) reviews[key] = value;
+  }
+  return { reviews };
+}
+
+async function getReview(relPath) {
+  const located = posixRelKey(relPath);
+  await assertExistingFile(located.abs);
+  const map = await loadReviewMap();
+  return { path: located.key, review: map[located.key] || null };
+}
+
+let reviewsQueue = Promise.resolve();
+
+function enqueueReviews(fn) {
+  const run = reviewsQueue.then(fn);
+  reviewsQueue = run.then(
+    () => {},
+    () => {}
+  );
+  return run;
+}
+
+async function writeReviewMap(map) {
+  const target = reviewsPath();
+  const tmp = target + ".tmp";
+  await fsp.mkdir(path.dirname(target), { recursive: true });
+  await fsp.writeFile(tmp, JSON.stringify(map, null, 2) + "\n", "utf8");
+  try {
+    await fsp.rename(tmp, target);
+  } catch {
+    await fsp.copyFile(tmp, target);
+    await fsp.rm(tmp, { force: true });
+  }
+}
+
+async function setReview(relPath, verdict, note) {
+  if (verdict !== "yes" && verdict !== "no") {
+    throw new StudioError(400, 'verdict must be "yes" or "no"');
+  }
+  if (note != null && typeof note !== "string") {
+    throw new StudioError(400, "note must be a string");
+  }
+  if (typeof note === "string" && note.length > 8000) {
+    throw new StudioError(413, "note too large");
+  }
+  const located = posixRelKey(relPath);
+  await assertExistingFile(located.abs);
+  return enqueueReviews(async () => {
+    const map = await loadReviewMap();
+    const review = {
+      verdict,
+      note: note == null ? "" : note,
+      updatedAt: new Date().toISOString(),
+    };
+    map[located.key] = review;
+    await writeReviewMap(map);
+    return { path: located.key, review };
+  });
+}
+
+async function clearReview(relPath) {
+  const located = posixRelKey(relPath);
+  await assertExistingFile(located.abs);
+  return enqueueReviews(async () => {
+    const map = await loadReviewMap();
+    delete map[located.key];
+    await writeReviewMap(map);
+    return { path: located.key, review: null };
+  });
+}
+
 module.exports = {
   StudioError,
   STUDIO_DIR,
@@ -603,6 +767,7 @@ module.exports = {
   IMAGE_EXT,
   getRoot,
   controlPath,
+  reviewsPath,
   kindFor,
   mimeFor,
   resolveUserFile,
@@ -616,4 +781,8 @@ module.exports = {
   resolveInputPath,
   readControl,
   writeCommands,
+  readReviews,
+  getReview,
+  setReview,
+  clearReview,
 };
