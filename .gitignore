@@ -1,0 +1,15 @@
+node_modules/
+_backup_prev_attempt/
+.playwright-mcp/
+*.log
+*.err
+control.json
+control.json.bak*
+
+# Local-only config (copy the *.example.json files)
+.mcp.json
+studio.config.json
+
+# Default workspace and internal notes
+workspace/
+SPEC*.md

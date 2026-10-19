@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shorts Studio</title>
+<style>
+  :root {
+    --bg: #12141a;
+    --side: #181b22;
+    --panel: #161922;
+    --line: #2c313c;
+    --text: #e7ecf3;
+    --muted: #8b93a5;
+    --accent: #8fd0c6;
+    --amber: #e6b450;
+    --ok: #7fd99a;
+    --danger: #f07178;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
+  }
+  button, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  #app { display: flex; height: 100%; min-height: 0; }
+  aside#side {
+    width: 300px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    background: var(--side);
+    border-right: 1px solid var(--line);
+    min-height: 0;
+  }
+  #brand { padding: 14px 14px 8px; }
+  #brand h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: 0.01em; }
+  #rootLabel {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    word-break: break-all;
+  }
+  #shortList { flex: 1; overflow: auto; padding: 4px 8px 12px; }
+  #status { padding: 8px 14px 12px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
+  .short { margin-bottom: 4px; }
+  .short-head, .file, .group {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text);
+  }
+  .short-head { padding: 6px 8px; display: flex; gap: 6px; align-items: baseline; }
+  .short-head:hover, .file:hover { background: #232833; }
+  .short-head .caret { color: var(--muted); width: 10px; }
+  .short-head .mtime { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .group {
+    padding: 6px 8px 2px 24px;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: default;
+  }
+  .file { padding: 4px 8px 4px 24px; color: #d5dbe6; font-size: 13px; }
+  .file.open { background: #24312f; color: var(--accent); }
+  .file .path { display: block; color: var(--muted); font-size: 11px; }
+  main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-height: 0;
+  }
+  #tabbar {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--line);
+    background: #14171e;
+    min-height: 42px;
+  }
+  #tabs { display: flex; gap: 4px; overflow-x: auto; flex: 1; padding: 6px; }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .tab.active { background: #222733; color: var(--text); border-color: var(--line); }
+  .tab.dirty .name::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+  .tab .x { opacity: 0.55; padding: 0 2px; }
+  .tab .x:hover { opacity: 1; color: var(--danger); }
+  .tab.dragging { opacity: 0.45; }
+  #saveBtn {
+    margin: 6px;
+    background: #1c3330;
+    border: 1px solid #3d7a6a;
+    border-radius: 6px;
+    padding: 4px 12px;
+  }
+  #saveBtn:disabled { opacity: 0.4; cursor: default; }
+  .conflict, .ready { margin: 8px 12px 0; border-radius: 8px; }
+  .conflict {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    background: #3a2e16;
+    border: 1px solid var(--amber);
+  }
+  .conflict button, .ready button, #addNote {
+    background: #262b36;
+    border: 1px solid #3a4150;
+    border-radius: 6px;
+    padding: 4px 8px;
+  }
+  .ready {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 16px;
+    background: #1c2e22;
+    border: 1px solid var(--ok);
+    box-shadow: 0 0 0 3px rgba(127, 217, 154, 0.16);
+  }
+  .ready strong { display: block; font-size: 18px; }
+  .ready .kind { color: var(--ok); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .ready p { margin: 4px 0 0; }
+  .conflict[hidden], .ready[hidden], .pane[hidden], [hidden] { display: none !important; }
+  .pane { flex: 1; min-height: 0; }
+  #empty { display: grid; place-items: center; color: var(--muted); }
+  #textPane { display: flex; background: var(--panel); }
+  #gutter {
+    width: 4.2rem;
+    flex: none;
+    overflow: hidden;
+    background: #101218;
+    border-right: 1px solid var(--line);
+    color: #6d7585;
+  }
+  #code { position: relative; flex: 1; min-width: 0; }
+  #hl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  #editor {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    resize: none;
+    background: transparent;
+    color: var(--text);
+    caret-color: var(--text);
+    padding: 10px 12px 10px 12px;
+    white-space: pre;
+    overflow: auto;
+  }
+  #editor, .ln, .hl-line {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  #gutterInner, #hlInner { padding-top: 10px; }
+  .ln { height: 20px; padding-right: 10px; text-align: right; }
+  .hl-line { height: 20px; }
+  .ln.hl { animation: hlfade 5s ease forwards; }
+  .hl-line.on { animation: hlbar 5s ease forwards; }
+  @keyframes hlfade {
+    0% { background: #e6b450; color: #1b1402; }
+    100% { background: transparent; color: #6d7585; }
+  }
+  @keyframes hlbar {
+    0% { background: rgba(230, 180, 80, 0.38); }
+    100% { background: transparent; }
+  }
+  #mdModes {
+    display: flex;
+    align-self: center;
+    margin-left: 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    flex: none;
+  }
+  #mdModes button {
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--line);
+    padding: 4px 10px;
+    color: var(--muted);
+  }
+  #mdModes button:last-child { border-right: 0; }
+  #mdModes button[aria-pressed="true"] { background: #1c3330; color: var(--text); }
+  #editorCol { display: flex; flex: 1; min-width: 0; min-height: 0; }
+  #mdPreview {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 20px 28px;
+    background: var(--panel);
+  }
+  #textPane[data-view="split"] #mdPreview { border-left: 1px solid var(--line); }
+  #textPane[data-view="preview"] #mdPreview .md-body { max-width: 760px; }
+  .md-body { font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 { line-height: 1.25; margin: 0.9em 0 0.35em; }
+  .md-body h1 { font-size: 1.7em; }
+  .md-body h2 { font-size: 1.35em; border-bottom: 1px solid var(--line); padding-bottom: 0.2em; }
+  .md-body h3 { font-size: 1.12em; }
+  .md-body p { margin: 0.45em 0; }
+  .md-body ul, .md-body ol { margin: 0.35em 0; padding-left: 1.4em; }
+  .md-body li { margin: 0.15em 0; }
+  .md-body a { color: var(--accent); }
+  .md-body hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+  .md-body code {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    background: #0e1218;
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  .md-body pre {
+    background: #0e1218;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow: auto;
+    margin: 0.5em 0;
+  }
+  .md-body pre code { background: none; padding: 0; }
+  .md-body table { border-collapse: collapse; margin: 0.6em 0; }
+  .md-body th, .md-body td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
+  .md-body th { background: #1c212b; text-align: left; }
+  .md-body blockquote {
+    margin: 0.6em 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent);
+    color: #c5cedd;
+  }
+  .md-block { border-radius: 6px; padding: 1px 8px; }
+  .md-block:empty { display: none; }
+  .md-block.changed { animation: mdblock 5s ease forwards; }
+  @keyframes mdblock {
+    0% { background: rgba(230, 180, 80, 0.38); box-shadow: inset 3px 0 0 #e6b450; }
+    100% { background: transparent; box-shadow: inset 3px 0 0 transparent; }
+  }
+  #mediaPane { display: flex; min-height: 0; }
+  #stage {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+  #wave {
+    width: 100%;
+    height: 96px;
+    background: #0e1218;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #waveMsg { margin: 0; color: var(--muted); font-size: 12px; min-height: 1em; }
+  audio { width: 100%; }
+  #videoWrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  video {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    background: #000;
+    border-radius: 8px;
+    object-fit: contain;
+  }
+  #imageWrap {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+    background: #0e1218;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: zoom-in;
+  }
+  #imageWrap.zoomed {
+    overflow: auto;
+    cursor: zoom-out;
+  }
+  #imageFrame { display: contents; }
+  #imageWrap.zoomed #imageFrame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+    min-width: 100%;
+    min-height: 100%;
+  }
+  #image {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+  }
+  #imageWrap.zoomed #image {
+    position: static;
+    inset: auto;
+    flex: none;
+    max-width: none;
+    max-height: none;
+    width: auto;
+    height: auto;
+    margin: 0;
+  }
+  #galleryPane { overflow: auto; padding: 12px; }
+  #galleryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    align-content: start;
+  }
+  .thumb {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #0e1218;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    color: inherit;
+    text-align: left;
+  }
+  .thumb:hover { border-color: var(--accent); }
+  .thumb img {
+    width: 100%;
+    height: 140px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 4px;
+  }
+  .thumb span { font-size: 12px; word-break: break-all; }
+  #notesPane {
+    width: 320px;
+    flex: none;
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #14171e;
+  }
+  #notesPane header { padding: 12px 12px 6px; }
+  #notesPane h2 { margin: 0; font-size: 14px; }
+  #reviewFile { margin: 4px 0 0; color: var(--muted); font-size: 11px; word-break: break-all; }
+  #noteList { flex: 1; overflow: auto; padding: 6px; }
+  .note {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .note:hover { background: #232833; }
+  .note-time { color: var(--accent); flex: none; font-variant-numeric: tabular-nums; }
+  #noteForm { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+  #noteText {
+    width: 100%;
+    resize: vertical;
+    background: #101218;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+  }
+  #toasts {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #243044;
+    border: 1px solid #3d5278;
+    max-width: 380px;
+  }
+  .toast.warn { background: #3a2e16; border-color: var(--amber); }
+  .toast.ok { background: #1a3324; border-color: var(--ok); }
+  .muted { color: var(--muted); }
+  .warn-text { color: var(--amber); }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div id="brand">
+      <h1>Shorts Studio</h1>
+      <p id="rootLabel"></p>
+    </div>
+    <div id="shortList"></div>
+    <div id="status"></div>
+  </aside>
+  <main>
+    <div id="tabbar">
+      <div id="tabs"></div>
+      <div id="mdModes" hidden role="group" aria-label="Markdown view">
+        <button type="button" data-mode="preview">Preview</button>
+        <button type="button" data-mode="edit">Edit</button>
+        <button type="button" data-mode="split">Split</button>
+      </div>
+      <button id="saveBtn" type="button" hidden>Save</button>
+    </div>
+    <div id="ready" class="ready" hidden>
+      <div>
+        <span class="kind" id="readyKind"></span>
+        <strong>Ready for review</strong>
+        <p id="readyNote"></p>
+      </div>
+      <button id="readyDismiss" type="button">Dismiss</button>
+    </div>
+    <div id="conflict" class="conflict" hidden>
+      <span>This file changed on disk and you have unsaved edits.</span>
+      <button id="reloadDisk" type="button">Reload from disk (lose my edits)</button>
+      <button id="keepMine" type="button">Keep mine</button>
+    </div>
+    <section id="empty" class="pane">Open a file from the sidebar. Ctrl+S saves.</section>
+    <section id="textPane" class="pane" hidden>
+      <div id="editorCol">
+        <div id="gutter"><div id="gutterInner"></div></div>
+        <div id="code">
+          <div id="hl"><div id="hlInner"></div></div>
+          <textarea id="editor" spellcheck="false" wrap="off" autocomplete="off" aria-label="Editor"></textarea>
+        </div>
+      </div>
+      <div id="mdPreview" hidden aria-label="Markdown preview"></div>
+    </section>
+    <section id="mediaPane" class="pane" hidden>
+      <div id="stage">
+        <canvas id="wave" hidden></canvas>
+        <p id="waveMsg" hidden></p>
+        <audio id="audio" controls hidden></audio>
+        <div id="videoWrap" hidden><video id="video" controls playsinline></video></div>
+        <div id="imageWrap" hidden><div id="imageFrame"><img id="image" alt="" draggable="false"></div></div>
+      </div>
+      <aside id="notesPane">
+        <header>
+          <h2>Review notes</h2>
+          <p id="reviewFile"></p>
+        </header>
+        <div id="noteList"></div>
+        <form id="noteForm">
+          <textarea id="noteText" rows="3" placeholder="What should change?"></textarea>
+          <button id="addNote" type="submit">Add note @ 0:00</button>
+        </form>
+      </aside>
+    </section>
+    <section id="galleryPane" class="pane" hidden>
+      <div id="galleryGrid"></div>
+    </section>
+    <div id="toasts"></div>
+  </main>
+</div>
+<script src="/vendor/marked.umd.js"></script>
+<script>
+(function () {
+  const POLL_MS = 1500;
+  const els = {
+    rootLabel: document.getElementById("rootLabel"),
+    shortList: document.getElementById("shortList"),
+    status: document.getElementById("status"),
+    tabs: document.getElementById("tabs"),
+    mdModes: document.getElementById("mdModes"),
+    saveBtn: document.getElementById("saveBtn"),
+    ready: document.getElementById("ready"),
+    readyKind: document.getElementById("readyKind"),
+    readyNote: document.getElementById("readyNote"),
+    readyDismiss: document.getElementById("readyDismiss"),
+    conflict: document.getElementById("conflict"),
+    reloadDisk: document.getElementById("reloadDisk"),
+    keepMine: document.getElementById("keepMine"),
+    empty: document.getElementById("empty"),
+    textPane: document.getElementById("textPane"),
+    editorCol: document.getElementById("editorCol"),
+    mdPreview: document.getElementById("mdPreview"),
+    mediaPane: document.getElementById("mediaPane"),
+    gutter: document.getElementById("gutter"),
+    gutterInner: document.getElementById("gutterInner"),
+    hl: document.getElementById("hl"),
+    hlInner: document.getElementById("hlInner"),
+    editor: document.getElementById("editor"),
+    wave: document.getElementById("wave"),
+    waveMsg: document.getElementById("waveMsg"),
+    audio: document.getElementById("audio"),
+    video: document.getElementById("video"),
+    videoWrap: document.getElementById("videoWrap"),
+    imageWrap: document.getElementById("imageWrap"),
+    image: document.getElementById("image"),
+    galleryPane: document.getElementById("galleryPane"),
+    galleryGrid: document.getElementById("galleryGrid"),
+    reviewFile: document.getElementById("reviewFile"),
+    noteList: document.getElementById("noteList"),
+    noteForm: document.getElementById("noteForm"),
+    noteText: document.getElementById("noteText"),
+    addNote: document.getElementById("addNote"),
+    toasts: document.getElementById("toasts"),
+  };
+
+  const state = {
+    root: "",
+    shorts: [],
+    treeSig: "",
+    expanded: new Set(),
+    tabs: [],
+    active: null,
+    lastSeq: null,
+    status: "",
+    restoring: false,
+  };
+
+  const OPEN_TABS_KEY = "studio.openTabs";
+  let dragTab = null;
+
+  function showBanner(text, level, timeoutSec) {
+    if (!text) return;
+    const el = document.createElement("div");
+    el.className = "toast " + (level === "warn" || level === "ok" ? level : "info");
+    el.textContent = text;
+    els.toasts.append(el);
+    const ms = Math.max(1, Number(timeoutSec) || 8) * 1000;
+    setTimeout(() => el.remove(), ms);
+  }
+
+  function showReady(kind, note) {
+    const labels = { audio: "Audio", short: "Short", image: "Image" };
+    els.readyKind.textContent = labels[kind] || "";
+    els.readyNote.textContent = note || "";
+    els.ready.hidden = false;
+  }
+
+  async function api(url, opts) {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = { error: text }; }
+    }
+    if (!res.ok) {
+      const err = new Error((data && data.error) || res.statusText || "Request failed");
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  function fileUrl(short, file) {
+    return "/api/file?short=" + encodeURIComponent(short) + "&file=" + encodeURIComponent(file);
+  }
+
+  function mediaUrl(short, file) {
+    return "/media?short=" + encodeURIComponent(short) + "&file=" + encodeURIComponent(file);
+  }
+
+  function reviewName(file) {
+    return file + ".review.md";
+  }
+
+  function isMarkdownFile(file) {
+    return String(file || "").toLowerCase().endsWith(".md");
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  const markedLib = window.marked;
+  if (markedLib && typeof markedLib.use === "function") {
+    markedLib.use({
+      renderer: {
+        html(token) {
+          const raw = token && typeof token === "object" ? token.text : token;
+          return escapeHtml(raw || "");
+        },
+        link(token) {
+          const href = String(token.href || "").trim().toLowerCase();
+          if (href.startsWith("javascript:") || href.startsWith("data:") || href.startsWith("vbscript:")) {
+            return escapeHtml(token.text || "");
+          }
+          return false;
+        },
+        image(token) {
+          const href = String(token.href || "").trim().toLowerCase();
+          if (href.startsWith("javascript:") || href.startsWith("data:") || href.startsWith("vbscript:")) {
+            return escapeHtml(token.text || "");
+          }
+          return false;
+        },
+      },
+    });
+  }
+
+  function formatClock(sec) {
+    if (!Number.isFinite(sec) || sec < 0) sec = 0;
+    const s = Math.floor(sec % 60);
+    const m = Math.floor(sec / 60);
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function formatWhen(ms) {
+    if (!ms) return "";
+    const d = new Date(ms);
+    return d.toLocaleString();
+  }
+
+  function changedLines(oldText, newText) {
+    const a = String(oldText).split("\n");
+    const b = String(newText).split("\n");
+    const n = a.length;
+    const m = b.length;
+    const changed = new Set();
+    if (n * m > 1500000) {
+      const len = Math.max(n, m);
+      for (let i = 0; i < len; i++) if (a[i] !== b[i]) changed.add(i + 1);
+      return changed;
+    }
+    const cols = m + 1;
+    const dp = new Uint32Array((n + 1) * cols);
+    const at = (i, j) => i * cols + j;
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[at(i, j)] = a[i] === b[j]
+          ? dp[at(i + 1, j + 1)] + 1
+          : Math.max(dp[at(i + 1, j)], dp[at(i, j + 1)]);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { i++; j++; }
+      else if (dp[at(i + 1, j)] >= dp[at(i, j + 1)]) i++;
+      else { changed.add(j + 1); j++; }
+    }
+    while (j < m) { changed.add(j + 1); j++; }
+    return changed;
+  }
+
+  function changedIndexes(a, b) {
+    const n = a.length;
+    const m = b.length;
+    const changed = new Set();
+    if (n * m > 1500000) {
+      const len = Math.max(n, m);
+      for (let i = 0; i < len; i++) if (a[i] !== b[i]) changed.add(i + 1);
+      return changed;
+    }
+    const cols = m + 1;
+    const dp = new Uint32Array((n + 1) * cols);
+    const at = (i, j) => i * cols + j;
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[at(i, j)] = a[i] === b[j]
+          ? dp[at(i + 1, j + 1)] + 1
+          : Math.max(dp[at(i + 1, j)], dp[at(i, j + 1)]);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { i++; j++; }
+      else if (dp[at(i + 1, j)] >= dp[at(i, j + 1)]) i++;
+      else { changed.add(j + 1); j++; }
+    }
+    while (j < m) { changed.add(j + 1); j++; }
+    return changed;
+  }
+
+  function markdownBlocks(src) {
+    const text = String(src);
+    if (!markedLib || typeof markedLib.lexer !== "function") {
+      return text.split(/\n{2,}/).filter((part) => part.length > 0);
+    }
+    const tokens = markedLib.lexer(text);
+    const raws = [];
+    for (const token of tokens) {
+      if (!token || token.type === "space" || token.type === "def") continue;
+      raws.push(typeof token.raw === "string" ? token.raw : "");
+    }
+    return raws;
+  }
+
+  function changedBlockIndexes(oldText, newText) {
+    try {
+      return changedIndexes(markdownBlocks(oldText), markdownBlocks(newText));
+    } catch {
+      return new Set();
+    }
+  }
+
+  function renderBlockHtml(src) {
+    const tokens = markedLib.lexer(String(src));
+    const links = tokens.links || {};
+    const html = [];
+    for (const token of tokens) {
+      if (!token || token.type === "space" || token.type === "def") continue;
+      const slice = [token];
+      slice.links = links;
+      html.push(markedLib.parser(slice));
+    }
+    return html;
+  }
+
+  function renderPreview() {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text" || !isMarkdownFile(tab.file)) return;
+    if ((tab.mdView || "preview") === "edit") return;
+    if (tab.mdBlockUntil && Date.now() > tab.mdBlockUntil) tab.mdBlocks = new Set();
+    const src = els.editor.value;
+    const keep = els.mdPreview.scrollTop;
+    const changed = tab.mdBlocks || new Set();
+    els.mdPreview.replaceChildren();
+    const body = document.createElement("div");
+    body.className = "md-body";
+    let parts = null;
+    let error = "";
+    if (!markedLib || typeof markedLib.lexer !== "function" || typeof markedLib.parser !== "function") {
+      error = "Markdown library failed to load.";
+    } else {
+      try {
+        parts = renderBlockHtml(src);
+      } catch (err) {
+        error = err.message || "Could not render markdown.";
+      }
+    }
+    if (error) {
+      const note = document.createElement("p");
+      note.className = "warn-text";
+      note.textContent = error;
+      const pre = document.createElement("pre");
+      pre.textContent = src;
+      body.append(note, pre);
+      els.mdPreview.append(body);
+      els.mdPreview.scrollTop = keep;
+      return;
+    }
+    parts.forEach((html, index) => {
+      const wrap = document.createElement("div");
+      wrap.className = "md-block" + (changed.has(index + 1) ? " changed" : "");
+      wrap.innerHTML = html;
+      body.append(wrap);
+    });
+    if (!parts.length) {
+      const note = document.createElement("p");
+      note.className = "muted";
+      note.textContent = "Nothing to preview.";
+      body.append(note);
+    }
+    els.mdPreview.append(body);
+    els.mdPreview.scrollTop = keep;
+    const first = body.querySelector(".md-block.changed");
+    if (!first) return;
+    const pane = els.mdPreview.getBoundingClientRect();
+    const box = first.getBoundingClientRect();
+    if (box.top < pane.top || box.bottom > pane.bottom) {
+      els.mdPreview.scrollTop += box.top - pane.top - 12;
+    }
+  }
+
+  function setBlockHighlights(tab, set) {
+    tab.mdBlocks = set;
+    tab.mdBlockUntil = Date.now() + 5000;
+    clearTimeout(tab.mdTimer);
+    tab.mdTimer = setTimeout(() => {
+      if (Date.now() >= tab.mdBlockUntil) {
+        tab.mdBlocks = new Set();
+        if (state.active === tab) renderPreview();
+      }
+    }, 5200);
+  }
+
+  function syncMdChrome() {
+    const tab = state.active;
+    const md = Boolean(tab && tab.kind === "text" && isMarkdownFile(tab.file));
+    const mode = md ? (tab.mdView || "preview") : "edit";
+    els.mdModes.hidden = !md;
+    els.textPane.dataset.view = mode;
+    for (const btn of els.mdModes.querySelectorAll("button")) {
+      btn.setAttribute("aria-pressed", md && btn.dataset.mode === mode ? "true" : "false");
+    }
+    els.editorCol.hidden = mode === "preview";
+    els.mdPreview.hidden = !md || mode === "edit";
+  }
+
+  function setMdView(mode) {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text" || !isMarkdownFile(tab.file)) return;
+    if (mode !== "preview" && mode !== "edit" && mode !== "split") return;
+    tab.mdView = mode;
+    syncMdChrome();
+    if (mode !== "preview") renderGutter();
+    if (mode !== "edit") renderPreview();
+    if (mode !== "preview") els.editor.focus();
+    persistTabs();
+  }
+
+  function setHighlights(tab, set) {
+    tab.highlights = set;
+    tab.highlightUntil = Date.now() + 5000;
+    if (state.active === tab) renderGutter();
+    clearTimeout(tab.hlTimer);
+    tab.hlTimer = setTimeout(() => {
+      if (Date.now() >= tab.highlightUntil) {
+        tab.highlights = new Set();
+        if (state.active === tab) renderGutter();
+      }
+    }, 5200);
+  }
+
+  function findMeta(short, file) {
+    const folder = state.shorts.find((item) => item.name === short);
+    if (!folder) return null;
+    return folder.text.find((item) => item.name === file) || folder.media.find((item) => item.name === file) || null;
+  }
+
+  function renderSidebar() {
+    const scroll = els.shortList.scrollTop;
+    els.shortList.replaceChildren();
+    if (!state.shorts.length) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = state.status || "No shorts found.";
+      els.shortList.append(p);
+    }
+    for (const folder of state.shorts) {
+      const wrap = document.createElement("div");
+      wrap.className = "short";
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "short-head";
+      const caret = document.createElement("span");
+      caret.className = "caret";
+      caret.textContent = state.expanded.has(folder.name) ? "▾" : "▸";
+      const name = document.createElement("span");
+      name.textContent = folder.name;
+      const when = document.createElement("span");
+      when.className = "mtime";
+      when.textContent = folder.mtime ? formatWhen(folder.mtime).split(",")[0] : "";
+      head.append(caret, name, when);
+      head.onclick = () => {
+        if (state.expanded.has(folder.name)) state.expanded.delete(folder.name);
+        else state.expanded.add(folder.name);
+        renderSidebar();
+      };
+      wrap.append(head);
+      if (state.expanded.has(folder.name)) {
+        addGroup(wrap, folder, "Text", folder.text, "text");
+        addGroup(wrap, folder, "Media", folder.media, "media");
+      }
+      els.shortList.append(wrap);
+    }
+    els.shortList.scrollTop = scroll;
+    els.rootLabel.textContent = state.root || "";
+    els.status.textContent = state.status || "";
+  }
+
+  function addGroup(wrap, folder, label, files, group) {
+    if (!files.length) return;
+    const title = document.createElement("div");
+    title.className = "group";
+    title.textContent = label;
+    wrap.append(title);
+    for (const item of files) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "file";
+      const open = state.tabs.some((tab) => tab.short === folder.name && tab.file === item.name);
+      if (open) btn.classList.add("open");
+      btn.title = formatWhen(item.mtime);
+      const base = item.name.split("/").pop();
+      btn.textContent = base;
+      if (item.name.includes("/")) {
+        const sub = document.createElement("span");
+        sub.className = "path";
+        sub.textContent = item.name.slice(0, item.name.length - base.length - 1);
+        btn.prepend(sub);
+      }
+      btn.onclick = () => {
+        const job = group === "media" ? openMedia(folder.name, item.name, item.kind) : openText(folder.name, item.name);
+        job.catch((err) => showBanner(err.message, "warn", 5));
+      };
+      wrap.append(btn);
+    }
+  }
+
+  function renderTabs() {
+    els.tabs.replaceChildren();
+    for (const tab of state.tabs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tab" + (tab === state.active ? " active" : "") + (tab.dirty ? " dirty" : "");
+      btn.title = tab.short + "/" + tab.file;
+      const label = document.createElement("span");
+      label.className = "name";
+      label.textContent = tab.kind === "gallery"
+        ? (tab.file ? tab.file.split("/").pop() : tab.short)
+        : tab.file.split("/").pop();
+      const x = document.createElement("span");
+      x.className = "x";
+      x.textContent = "×";
+      x.title = "Close";
+      x.onclick = (event) => {
+        event.stopPropagation();
+        closeTab(tab);
+      };
+      btn.draggable = true;
+      btn.addEventListener("dragstart", (event) => {
+        if (event.target.closest(".x")) {
+          event.preventDefault();
+          return;
+        }
+        dragTab = tab;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", "tab");
+        btn.classList.add("dragging");
+      });
+      btn.addEventListener("dragend", () => {
+        dragTab = null;
+        btn.classList.remove("dragging");
+      });
+      btn.addEventListener("dragover", (event) => {
+        if (!dragTab || dragTab === tab) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      });
+      btn.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const from = state.tabs.indexOf(dragTab);
+        dragTab = null;
+        reorderTab(from, state.tabs.indexOf(tab));
+      });
+      btn.append(label, x);
+      btn.onclick = () => activate(tab);
+      els.tabs.append(btn);
+    }
+    const text = state.active && state.active.kind === "text";
+    els.saveBtn.hidden = !text;
+    els.saveBtn.disabled = !text || !state.active.dirty || state.active.saving;
+    els.saveBtn.textContent = state.active && state.active.saving ? "Saving…" : "Save";
+    syncMdChrome();
+  }
+
+  function updateConflict() {
+    const tab = state.active;
+    els.conflict.hidden = !(tab && tab.kind === "text" && tab.conflict);
+  }
+
+  function showPane(which) {
+    els.empty.hidden = which !== "empty";
+    els.textPane.hidden = which !== "text";
+    els.mediaPane.hidden = which !== "media";
+    els.galleryPane.hidden = which !== "gallery";
+  }
+
+  function stashText() {
+    if (state.active && state.active.kind === "text") {
+      state.active.content = els.editor.value;
+      state.active.dirty = state.active.content !== state.active.savedContent;
+    }
+  }
+
+  function pauseMedia() {
+    if (state.active && state.active.kind === "audio") {
+      state.active.time = els.audio.currentTime;
+      els.audio.pause();
+    }
+    if (state.active && state.active.kind === "video") {
+      state.active.time = els.video.currentTime;
+      els.video.pause();
+    }
+  }
+
+  function activate(tab) {
+    if (state.active === tab) {
+      const prevMode = els.textPane.dataset.view || "";
+      renderTabs();
+      updateConflict();
+      if (tab && tab.kind === "text") {
+        const mode = isMarkdownFile(tab.file) ? (tab.mdView || "preview") : "edit";
+        const contentChanged = els.editor.value !== tab.content;
+        if (contentChanged) els.editor.value = tab.content;
+        if (contentChanged || mode !== prevMode) {
+          if (mode !== "preview") renderGutter();
+          if (mode !== "edit") renderPreview();
+        }
+      }
+      return;
+    }
+    stashText();
+    pauseMedia();
+    state.active = tab;
+    renderTabs();
+    updateConflict();
+    if (!tab) {
+      showPane("empty");
+      persistTabs();
+      return;
+    }
+    if (tab.kind === "text") {
+      showPane("text");
+      els.editor.value = tab.content;
+      syncMdChrome();
+      renderGutter();
+      renderPreview();
+      if (!isMarkdownFile(tab.file) || tab.mdView !== "preview") els.editor.focus();
+      persistTabs();
+      return;
+    }
+    if (tab.kind === "gallery") {
+      showPane("gallery");
+      renderGallery(tab);
+      persistTabs();
+      return;
+    }
+    showPane("media");
+    loadMedia(tab);
+    persistTabs();
+  }
+
+  function renderGutter() {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text") return;
+    if (tab.highlightUntil && Date.now() > tab.highlightUntil) tab.highlights = new Set();
+    const text = els.editor.value;
+    const count = Math.max(1, text.split("\n").length);
+    const highlights = tab.highlights || new Set();
+    els.gutterInner.replaceChildren();
+    els.hlInner.replaceChildren();
+    const width = Math.max(els.editor.scrollWidth, els.editor.clientWidth);
+    for (let i = 1; i <= count; i++) {
+      const line = document.createElement("div");
+      line.className = "ln" + (highlights.has(i) ? " hl" : "");
+      line.textContent = String(i);
+      els.gutterInner.append(line);
+      const bar = document.createElement("div");
+      bar.className = "hl-line" + (highlights.has(i) ? " on" : "");
+      bar.style.width = width + "px";
+      els.hlInner.append(bar);
+    }
+    syncScroll();
+  }
+
+  function syncScroll() {
+    els.gutter.scrollTop = els.editor.scrollTop;
+    els.hl.scrollTop = els.editor.scrollTop;
+  }
+
+  function scrollToLine(line) {
+    const top = 10 + (Math.max(1, line) - 1) * 20;
+    els.editor.scrollTop = Math.max(0, top - els.editor.clientHeight * 0.3);
+    syncScroll();
+  }
+
+  function closeTab(tab) {
+    if (state.active === tab) {
+      pauseMedia();
+      state.active = null;
+    }
+    const index = state.tabs.indexOf(tab);
+    if (index >= 0) state.tabs.splice(index, 1);
+    if (!state.active && state.tabs.length) {
+      activate(state.tabs[Math.max(0, index - 1)]);
+    } else if (!state.tabs.length) {
+      state.active = null;
+      showPane("empty");
+      renderTabs();
+      updateConflict();
+    } else {
+      renderTabs();
+    }
+    renderSidebar();
+    persistTabs();
+  }
+
+  function closeMatch(short, file) {
+    const found = state.tabs.filter((tab) => tab.short === short && tab.file === file);
+    for (const tab of found) closeTab(tab);
+  }
+
+  function closeAll() {
+    if (state.active) pauseMedia();
+    state.tabs = [];
+    state.active = null;
+    showPane("empty");
+    renderTabs();
+    updateConflict();
+    renderSidebar();
+    persistTabs();
+  }
+
+  function applyDisk(tab, data, highlight) {
+    const prev = tab.content;
+    tab.content = data.content;
+    tab.savedContent = data.content;
+    tab.hash = data.hash;
+    tab.mtime = data.mtime;
+    tab.size = data.size;
+    tab.eol = data.eol || "\n";
+    tab.dirty = false;
+    tab.conflict = false;
+    tab.disk = null;
+    tab.ackedHash = null;
+    if (highlight && prev !== data.content) {
+      setHighlights(tab, changedLines(prev, data.content));
+      if (isMarkdownFile(tab.file)) setBlockHighlights(tab, changedBlockIndexes(prev, data.content));
+    }
+    if (state.active === tab) {
+      els.editor.value = tab.content;
+      renderGutter();
+      renderPreview();
+      updateConflict();
+    }
+    renderTabs();
+  }
+
+  async function openText(short, file, opts) {
+    state.expanded.add(short);
+    let tab = state.tabs.find((item) => item.kind === "text" && item.short === short && item.file === file);
+    const data = await api(fileUrl(short, file));
+    if (!tab) {
+      tab = {
+        kind: "text",
+        short,
+        file,
+        content: data.content,
+        savedContent: data.content,
+        hash: data.hash,
+        mtime: data.mtime,
+        size: data.size,
+        eol: data.eol || "\n",
+        dirty: false,
+        conflict: false,
+        disk: null,
+        ackedHash: null,
+        highlights: new Set(),
+        highlightUntil: 0,
+        mdView: isMarkdownFile(file) ? normalizeMdView(opts && opts.mdView) : "edit",
+        mdBlocks: new Set(),
+        mdBlockUntil: 0,
+        saving: false,
+        lineCount: Math.max(1, data.content.split("\n").length),
+      };
+      state.tabs.push(tab);
+    } else if (!tab.dirty && data.hash !== tab.hash) {
+      const prev = tab.content;
+      Object.assign(tab, {
+        content: data.content,
+        savedContent: data.content,
+        hash: data.hash,
+        mtime: data.mtime,
+        size: data.size,
+        eol: data.eol || "\n",
+      });
+      if (prev !== data.content) {
+        setHighlights(tab, changedLines(prev, data.content));
+        if (isMarkdownFile(file)) setBlockHighlights(tab, changedBlockIndexes(prev, data.content));
+      }
+    }
+    if (opts && opts.line && isMarkdownFile(file) && tab.mdView === "preview") tab.mdView = "split";
+    if (!(opts && opts.restore)) {
+      activate(tab);
+      renderSidebar();
+    }
+    if (opts && opts.line) {
+      const line = Math.max(1, Number(opts.line) || 1);
+      requestAnimationFrame(() => {
+        if (opts.highlight) setHighlights(tab, new Set([line]));
+        if (state.active === tab) scrollToLine(line);
+      });
+    }
+    persistTabs();
+  }
+
+  function inferMediaKind(file) {
+    const lower = String(file || "").toLowerCase();
+    if (lower.endsWith(".mp4")) return "video";
+    if (/\.(png|jpe?g|webp)$/.test(lower)) return "image";
+    return "audio";
+  }
+
+  async function openMedia(short, file, kind, opts) {
+    state.expanded.add(short);
+    let tab = state.tabs.find((item) => item.short === short && item.file === file && item.kind !== "text" && item.kind !== "gallery");
+    if (!tab) {
+      tab = {
+        kind: kind || inferMediaKind(file),
+        short,
+        file,
+        time: 0,
+        peaks: null,
+        peaksLoading: false,
+        reviewContent: "",
+        reviewHash: "",
+        reviewMtime: 0,
+        reviewSize: -1,
+        reviewMissing: true,
+        notes: [],
+        noteSaving: false,
+        zoomed: false,
+        scrollLeft: 0,
+        scrollTop: 0,
+      };
+      state.tabs.push(tab);
+      await reloadNotes(tab);
+    }
+    if (!(opts && opts.restore)) {
+      activate(tab);
+      renderSidebar();
+    }
+    persistTabs();
+  }
+
+  function galleryImages(short, folder) {
+    const meta = state.shorts.find((item) => item.name === short);
+    if (!meta) return [];
+    const prefix = folder ? String(folder).replace(/\\/g, "/").replace(/\/$/, "") + "/" : "";
+    return meta.media.filter((item) => {
+      if (item.kind !== "image") return false;
+      if (!prefix) return item.name.indexOf("/") === -1;
+      if (!item.name.startsWith(prefix)) return false;
+      return item.name.indexOf("/", prefix.length) === -1;
+    });
+  }
+
+  function sameImages(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i].name !== b[i].name || a[i].mtime !== b[i].mtime || a[i].size !== b[i].size) return false;
+    }
+    return true;
+  }
+
+  async function openGallery(short, folder, images, opts) {
+    state.expanded.add(short);
+    const file = folder ? String(folder).replace(/\\/g, "/").replace(/\/$/, "") : "";
+    let tab = state.tabs.find((item) => item.kind === "gallery" && item.short === short && item.file === file);
+    const live = galleryImages(short, file);
+    const seeded = Array.isArray(images) ? images : [];
+    if (!tab) {
+      tab = { kind: "gallery", short, file, images: live.length ? live : seeded };
+      state.tabs.push(tab);
+    } else {
+      tab.images = live.length ? live : (seeded.length ? seeded : tab.images || []);
+    }
+    if (!(opts && opts.restore)) {
+      activate(tab);
+      renderSidebar();
+    }
+    persistTabs();
+  }
+
+  function renderGallery(tab) {
+    els.galleryGrid.replaceChildren();
+    const images = tab.images || [];
+    if (!images.length) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "No images in this folder.";
+      els.galleryGrid.append(p);
+      return;
+    }
+    for (const item of images) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "thumb";
+      const img = document.createElement("img");
+      img.src = mediaUrl(tab.short, item.name);
+      img.alt = item.name.split("/").pop();
+      const label = document.createElement("span");
+      label.textContent = item.name.split("/").pop();
+      btn.append(img, label);
+      btn.onclick = () => {
+        openMedia(tab.short, item.name, "image").catch((err) => showBanner(err.message, "warn", 5));
+      };
+      els.galleryGrid.append(btn);
+    }
+  }
+
+  function applyImageZoom(tab) {
+    els.imageWrap.classList.toggle("zoomed", Boolean(tab.zoomed));
+    requestAnimationFrame(() => {
+      if (state.active !== tab) return;
+      els.imageWrap.scrollLeft = tab.zoomed ? tab.scrollLeft || 0 : 0;
+      els.imageWrap.scrollTop = tab.zoomed ? tab.scrollTop || 0 : 0;
+    });
+  }
+
+  function loadImage(tab) {
+    els.wave.hidden = true;
+    els.waveMsg.hidden = true;
+    els.audio.hidden = true;
+    els.videoWrap.hidden = true;
+    els.imageWrap.hidden = false;
+    const url = mediaUrl(tab.short, tab.file);
+    if (els.image.dataset.src !== url) {
+      els.image.src = url;
+      els.image.dataset.src = url;
+      els.image.alt = tab.file.split("/").pop();
+    }
+    applyImageZoom(tab);
+    renderNotes(tab);
+    updateNoteButton();
+  }
+
+  function loadMedia(tab) {
+    if (tab.kind === "image") {
+      loadImage(tab);
+      return;
+    }
+    els.imageWrap.hidden = true;
+    const url = mediaUrl(tab.short, tab.file);
+    const audio = tab.kind === "audio";
+    els.wave.hidden = !audio;
+    els.waveMsg.hidden = !audio;
+    els.audio.hidden = !audio;
+    els.videoWrap.hidden = audio;
+    const el = audio ? els.audio : els.video;
+    const other = audio ? els.video : els.audio;
+    if (other.dataset.src) {
+      other.pause();
+      other.removeAttribute("src");
+      other.dataset.src = "";
+      other.load();
+    }
+    if (el.dataset.src !== url) {
+      el.src = url;
+      el.dataset.src = url;
+    }
+    const applyTime = () => {
+      if (Number.isFinite(tab.time)) el.currentTime = tab.time;
+      updateNoteButton();
+    };
+    if (el.readyState >= 1) applyTime();
+    else el.addEventListener("loadedmetadata", applyTime, { once: true });
+    if (audio) ensurePeaks(tab);
+    renderNotes(tab);
+    updateNoteButton();
+  }
+
+  async function ensurePeaks(tab) {
+    if (tab.peaks) {
+      if (state.active === tab) drawWave(tab);
+      return;
+    }
+    if (tab.peaksLoading) return;
+    tab.peaksLoading = true;
+    els.waveMsg.textContent = "Drawing waveform…";
+    try {
+      const built = await buildPeaks(mediaUrl(tab.short, tab.file));
+      tab.peaks = built.peaks;
+      if (state.active === tab) {
+        els.waveMsg.textContent = "";
+        drawWave(tab);
+      }
+    } catch {
+      if (state.active === tab) els.waveMsg.textContent = "Waveform unavailable. Playback still works.";
+    } finally {
+      tab.peaksLoading = false;
+    }
+  }
+
+  async function buildPeaks(url) {
+    const ctx = new AudioContext();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("media fetch failed");
+      const raw = await res.arrayBuffer();
+      const audio = await ctx.decodeAudioData(raw);
+      const channel = audio.getChannelData(0);
+      const buckets = 1600;
+      const peaks = new Float32Array(buckets);
+      const step = channel.length / buckets;
+      for (let i = 0; i < buckets; i++) {
+        const start = Math.floor(i * step);
+        const end = Math.min(channel.length, Math.floor((i + 1) * step));
+        let max = 0;
+        for (let j = start; j < end; j++) {
+          const value = channel[j] < 0 ? -channel[j] : channel[j];
+          if (value > max) max = value;
+        }
+        peaks[i] = max;
+      }
+      return { peaks, duration: audio.duration };
+    } finally {
+      ctx.close();
+    }
+  }
+
+  function drawWave(tab) {
+    const canvas = els.wave;
+    const width = canvas.clientWidth || 300;
+    const height = canvas.clientHeight || 96;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    const g = canvas.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, width, height);
+    const peaks = tab.peaks;
+    if (!peaks) return;
+    const duration = els.audio.duration;
+    const progress = duration ? (els.audio.currentTime || 0) / duration : 0;
+    const mid = height / 2;
+    for (let x = 0; x < width; x++) {
+      const index = Math.min(peaks.length - 1, Math.floor((x / width) * peaks.length));
+      const amp = Math.max(1, peaks[index] * height * 0.46);
+      g.fillStyle = x / width <= progress ? "#8fd0c6" : "#3c4c5c";
+      g.fillRect(x, mid - amp, 1, amp * 2);
+    }
+    g.fillStyle = "#e6b450";
+    g.fillRect(Math.max(0, progress * width - 1), 0, 2, height);
+  }
+
+  function parseNotes(content) {
+    const notes = [];
+    String(content || "").split("\n").forEach((line) => {
+      const match = /^- \[(\d{1,4}):(\d{2})\]\s*(.*)$/.exec(line);
+      if (!match) return;
+      notes.push({
+        label: Number(match[1]) + ":" + match[2],
+        seconds: Number(match[1]) * 60 + Number(match[2]),
+        text: match[3],
+      });
+    });
+    return notes;
+  }
+
+  function parseImageNotes(content) {
+    const notes = [];
+    String(content || "").split("\n").forEach((line) => {
+      const timed = /^- \[(\d{1,4}):(\d{2})\]\s*(.*)$/.exec(line);
+      if (timed) {
+        if (timed[3].trim()) notes.push({ label: "", seconds: null, text: timed[3].trim() });
+        return;
+      }
+      const plain = /^- (.*)$/.exec(line);
+      if (plain && plain[1].trim()) notes.push({ label: "", seconds: null, text: plain[1].trim() });
+    });
+    return notes;
+  }
+
+  function renderNotes(tab) {
+    els.reviewFile.textContent = reviewName(tab.file);
+    els.noteList.replaceChildren();
+    if (!tab.notes.length) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "No notes yet.";
+      els.noteList.append(p);
+      return;
+    }
+    for (const note of tab.notes) {
+      const row = document.createElement(note.seconds == null ? "div" : "button");
+      row.className = "note";
+      if (note.seconds != null) {
+        row.type = "button";
+        const time = document.createElement("span");
+        time.className = "note-time";
+        time.textContent = note.label;
+        row.append(time);
+        row.onclick = () => seekTo(note.seconds);
+      }
+      const body = document.createElement("span");
+      body.textContent = note.text;
+      row.append(body);
+      els.noteList.append(row);
+    }
+  }
+
+  async function reloadNotes(tab, preset) {
+    const review = reviewName(tab.file);
+    let data = preset || null;
+    if (!data) {
+      const known = state.shorts.some((folder) => folder.name === tab.short);
+      if (known && !findMeta(tab.short, review)) {
+        data = null;
+      } else {
+        try {
+          data = await api(fileUrl(tab.short, review));
+        } catch (err) {
+          if (err.status !== 404) throw err;
+          data = null;
+        }
+      }
+    }
+    if (!data || data.deleted) {
+      tab.reviewContent = "";
+      tab.reviewHash = "";
+      tab.reviewMtime = 0;
+      tab.reviewSize = -1;
+      tab.reviewMissing = true;
+    } else {
+      tab.reviewContent = data.content || "";
+      tab.reviewHash = data.hash || "";
+      tab.reviewMtime = data.mtime || 0;
+      tab.reviewSize = data.size || 0;
+      tab.reviewMissing = false;
+    }
+    tab.notes = tab.kind === "image" ? parseImageNotes(tab.reviewContent) : parseNotes(tab.reviewContent);
+    if (state.active === tab) renderNotes(tab);
+  }
+
+  function mediaElement(tab) {
+    return tab && tab.kind === "video" ? els.video : els.audio;
+  }
+
+  function updateNoteButton() {
+    const tab = state.active;
+    if (!tab) return;
+    if (tab.kind === "image") {
+      els.addNote.textContent = "Add note";
+      return;
+    }
+    if (tab.kind !== "audio" && tab.kind !== "video") return;
+    els.addNote.textContent = "Add note @ " + formatClock(mediaElement(tab).currentTime || 0);
+  }
+
+  function seekTo(seconds) {
+    const tab = state.active;
+    if (!tab) return;
+    const el = mediaElement(tab);
+    const apply = () => {
+      el.currentTime = seconds;
+      tab.time = seconds;
+      updateNoteButton();
+      if (tab.kind === "audio") drawWave(tab);
+    };
+    if (el.readyState >= 1) apply();
+    else el.addEventListener("loadedmetadata", apply, { once: true });
+  }
+
+  async function addNote(event) {
+    event.preventDefault();
+    const tab = state.active;
+    if (!tab || (tab.kind !== "audio" && tab.kind !== "video" && tab.kind !== "image")) return;
+    const text = els.noteText.value.trim().replace(/\s+/g, " ");
+    if (!text) return;
+    const line = tab.kind === "image"
+      ? "- " + text
+      : "- [" + formatClock(mediaElement(tab).currentTime || 0) + "] " + text;
+    const review = reviewName(tab.file);
+    tab.noteSaving = true;
+    try {
+      let existing = { content: "", hash: "", eol: "\n" };
+      try {
+        existing = await api(fileUrl(tab.short, review));
+      } catch (err) {
+        if (err.status !== 404) throw err;
+      }
+      const base = existing.content || "";
+      const next = base.length && !base.endsWith("\n") ? base + "\n" + line + "\n" : base + line + "\n";
+      const saved = await api("/api/file", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          short: tab.short,
+          file: review,
+          content: next,
+          baseHash: existing.hash || "",
+          eol: existing.eol || "\n",
+        }),
+      });
+      els.noteText.value = "";
+      await reloadNotes(tab, Object.assign({ content: next }, saved));
+      showBanner("Note saved", "ok", 3);
+    } catch (err) {
+      if (err.status === 409) {
+        showBanner("Review notes changed on disk. Reloaded — add the note again.", "warn", 6);
+        await reloadNotes(tab, err.data && err.data.content != null ? err.data : null);
+      } else {
+        showBanner(err.message, "warn", 5);
+      }
+    } finally {
+      tab.noteSaving = false;
+    }
+  }
+
+  async function saveActive() {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text" || tab.saving) return;
+    tab.content = els.editor.value;
+    tab.dirty = tab.content !== tab.savedContent;
+    if (!tab.dirty) return;
+    tab.saving = true;
+    renderTabs();
+    try {
+      const data = await api("/api/file", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          short: tab.short,
+          file: tab.file,
+          content: tab.content,
+          baseHash: tab.hash || "",
+          eol: tab.eol || "\n",
+        }),
+      });
+      tab.savedContent = tab.content;
+      tab.dirty = false;
+      tab.hash = data.hash;
+      tab.mtime = data.mtime;
+      tab.size = data.size;
+      tab.eol = data.eol || tab.eol;
+      tab.conflict = false;
+      tab.disk = null;
+      tab.ackedHash = null;
+      updateConflict();
+      showBanner("Saved", "ok", 2);
+    } catch (err) {
+      if (err.status === 409 && err.data) {
+        tab.disk = err.data;
+        tab.conflict = true;
+        updateConflict();
+        showBanner("Save blocked. The file changed on disk.", "warn", 5);
+      } else {
+        showBanner(err.message, "warn", 5);
+      }
+    } finally {
+      tab.saving = false;
+      renderTabs();
+    }
+  }
+
+  function keepMine() {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text") return;
+    if (tab.disk) {
+      tab.hash = tab.disk.deleted ? "" : tab.disk.hash || "";
+      tab.ackedHash = tab.hash;
+      if (!tab.disk.deleted) {
+        tab.mtime = tab.disk.mtime;
+        tab.size = tab.disk.size;
+        tab.eol = tab.disk.eol || tab.eol;
+      }
+    }
+    tab.conflict = false;
+    tab.disk = null;
+    updateConflict();
+    showBanner("Keeping your edits. Save will overwrite the copy on disk.", "warn", 4);
+  }
+
+  function reloadFromDisk() {
+    const tab = state.active;
+    if (!tab || !tab.disk) return;
+    if (tab.disk.deleted) {
+      showBanner("File was deleted on disk.", "warn", 4);
+      return;
+    }
+    applyDisk(tab, tab.disk, true);
+  }
+
+  async function refreshText(tab) {
+    const meta = findMeta(tab.short, tab.file);
+    if (!meta) {
+      if (!tab.dirty) {
+        if (!tab.missingNotified) {
+          tab.missingNotified = true;
+          showBanner(tab.file + " is no longer on disk.", "warn", 5);
+        }
+        return;
+      }
+      if (tab.ackedHash !== "") {
+        tab.disk = { deleted: true, content: "", hash: "", eol: "\n" };
+        tab.conflict = true;
+        if (state.active === tab) updateConflict();
+      }
+      return;
+    }
+    tab.missingNotified = false;
+    if (meta.mtime === tab.mtime && meta.size === tab.size) return;
+    if (tab.saving) return;
+    const fresh = await api(fileUrl(tab.short, tab.file));
+    if (fresh.hash === tab.hash) {
+      tab.mtime = fresh.mtime;
+      tab.size = fresh.size;
+      return;
+    }
+    if (!tab.dirty) {
+      applyDisk(tab, fresh, true);
+      return;
+    }
+    if (fresh.hash !== tab.ackedHash) {
+      tab.disk = fresh;
+      tab.conflict = true;
+      if (state.active === tab) updateConflict();
+    }
+  }
+
+  function refreshGallery(tab) {
+    const folder = state.shorts.find((item) => item.name === tab.short);
+    if (!folder) return;
+    const live = galleryImages(tab.short, tab.file);
+    if (sameImages(live, tab.images || [])) return;
+    tab.images = live;
+    if (state.active === tab) renderGallery(tab);
+  }
+
+  async function refreshReview(tab) {
+    if (tab.noteSaving) return;
+    const meta = findMeta(tab.short, reviewName(tab.file));
+    if (!meta) {
+      if (!tab.reviewMissing && tab.reviewSize !== -1) await reloadNotes(tab);
+      return;
+    }
+    if (meta.mtime === tab.reviewMtime && meta.size === tab.reviewSize) return;
+    await reloadNotes(tab);
+  }
+
+  async function openAnything(short, file) {
+    const kind = inferMediaKind(file);
+    const lower = String(file || "").toLowerCase();
+    if (lower.endsWith(".wav") || lower.endsWith(".mp3") || lower.endsWith(".mp4") || /\.(png|jpe?g|webp)$/.test(lower)) {
+      return openMedia(short, file, kind);
+    }
+    return openText(short, file);
+  }
+
+  async function resolvePath(input) {
+    return api("/api/resolve?path=" + encodeURIComponent(input));
+  }
+
+  async function openReview(loc) {
+    if (loc.kind === "gallery") {
+      await openGallery(loc.short, loc.file || "", loc.images);
+      return;
+    }
+    const match = /^(.*\.(wav|mp3|mp4|png|jpg|jpeg|webp))\.review\.md$/i.exec(loc.file);
+    if (match) {
+      await openMedia(loc.short, match[1], inferMediaKind(match[1]));
+      return;
+    }
+    if (loc.kind === "audio" || loc.kind === "video" || loc.kind === "image") {
+      await openMedia(loc.short, loc.file, loc.kind);
+    } else await openText(loc.short, loc.file);
+  }
+
+  async function runCommand(cmd) {
+    if (!cmd || typeof cmd.action !== "string") return;
+    if (cmd.action === "open") await openAnything(cmd.short, cmd.file);
+    else if (cmd.action === "close") closeMatch(cmd.short, cmd.file);
+    else if (cmd.action === "closeAll") closeAll();
+    else if (cmd.action === "goto") {
+      await openText(cmd.short, cmd.file, { line: cmd.line, highlight: cmd.highlight !== false });
+    } else if (cmd.action === "banner") {
+      showBanner(String(cmd.text || ""), cmd.level || "info", cmd.timeoutSec);
+    } else if (cmd.action === "open_review") {
+      const loc = await resolvePath(cmd.path);
+      await openReview(loc);
+      if (cmd.note) showBanner(String(cmd.note), "info", 8);
+    } else if (cmd.action === "notify_ready") {
+      const loc = await resolvePath(cmd.path);
+      await openReview(loc);
+      showReady(cmd.kind, cmd.note ? String(cmd.note) : "");
+    }
+  }
+
+  async function applyControl(control) {
+    const seq = Number(control && control.seq) || 0;
+    if (state.lastSeq === null) {
+      state.lastSeq = seq;
+      return;
+    }
+    if (seq === state.lastSeq) return;
+    state.lastSeq = seq;
+    const commands = Array.isArray(control.commands) ? control.commands : [];
+    for (const cmd of commands) {
+      try {
+        await runCommand(cmd);
+      } catch (err) {
+        showBanner(err.message || "Command failed", "warn", 6);
+      }
+    }
+  }
+
+  async function poll() {
+    const [tree, control] = await Promise.all([api("/api/shorts"), api("/api/control")]);
+    state.root = tree.root || "";
+    state.shorts = tree.shorts || [];
+    state.status = tree.missing ? "SHORTS_ROOT does not exist" : "Updated " + new Date().toLocaleTimeString();
+    const sig = JSON.stringify(state.shorts);
+    if (sig !== state.treeSig) {
+      state.treeSig = sig;
+      renderSidebar();
+    } else {
+      els.rootLabel.textContent = state.root;
+      els.status.textContent = state.status;
+    }
+    for (const tab of state.tabs.slice()) {
+      if (tab.kind === "text") await refreshText(tab);
+      else if (tab.kind === "gallery") refreshGallery(tab);
+      else await refreshReview(tab);
+    }
+    await applyControl(control);
+  }
+
+  async function loop() {
+    try {
+      await poll();
+    } catch (err) {
+      state.status = err.message || "Poll failed";
+      els.status.textContent = state.status;
+    }
+    setTimeout(loop, POLL_MS);
+  }
+
+  function normalizeMdView(mode) {
+    return mode === "edit" || mode === "split" ? mode : "preview";
+  }
+
+  function persistTabs() {
+    if (state.restoring) return;
+    try {
+      const tabs = state.tabs.map((tab) => {
+        const rec = { short: tab.short, file: tab.file || "", kind: tab.kind };
+        if (tab.kind === "text" && isMarkdownFile(tab.file)) rec.mdView = normalizeMdView(tab.mdView);
+        return rec;
+      });
+      const active = state.active ? state.tabs.indexOf(state.active) : -1;
+      localStorage.setItem(OPEN_TABS_KEY, JSON.stringify({ tabs, active }));
+    } catch {
+      // Storage can be unavailable. The session still works.
+    }
+  }
+
+  function reorderTab(from, to) {
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return;
+    if (from < 0 || to < 0 || from >= state.tabs.length || to >= state.tabs.length) return;
+    if (from === to) return;
+    const [tab] = state.tabs.splice(from, 1);
+    state.tabs.splice(to, 0, tab);
+    renderTabs();
+    persistTabs();
+  }
+
+  function readSavedTabs() {
+    try {
+      const data = JSON.parse(localStorage.getItem(OPEN_TABS_KEY) || "");
+      if (!data || !Array.isArray(data.tabs)) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function validSavedTab(rec) {
+    if (!rec || typeof rec !== "object") return false;
+    if (typeof rec.short !== "string" || rec.short.length === 0) return false;
+    if (typeof rec.file !== "string") return false;
+    if (rec.kind !== "text" && rec.kind !== "audio" && rec.kind !== "video" && rec.kind !== "image" && rec.kind !== "gallery") return false;
+    if (rec.kind !== "gallery" && rec.file.length === 0) return false;
+    return true;
+  }
+
+  function findOpenTab(rec) {
+    return state.tabs.find((tab) => tab.kind === rec.kind && tab.short === rec.short && (tab.file || "") === (rec.file || ""));
+  }
+
+  async function reopenSaved(rec) {
+    const rel = rec.kind === "gallery" && !rec.file ? rec.short : rec.short + "/" + rec.file;
+    let loc;
+    try {
+      loc = await resolvePath(rel);
+    } catch (err) {
+      if (err && (err.status === 404 || err.status === 400)) return "missing";
+      throw err;
+    }
+    if (!loc || loc.short !== rec.short || (loc.file || "") !== (rec.file || "")) return "missing";
+    if (rec.kind === "gallery") {
+      if (loc.kind !== "gallery") return "missing";
+      await openGallery(loc.short, loc.file || "", loc.images, { restore: true });
+      return "opened";
+    }
+    if (loc.kind !== rec.kind) return "missing";
+    if (rec.kind === "text") await openText(rec.short, rec.file, { restore: true, mdView: rec.mdView });
+    else await openMedia(rec.short, rec.file, rec.kind, { restore: true });
+    return "opened";
+  }
+
+  function pickRestored(activeIndex, opened) {
+    if (!opened.length) return null;
+    const exact = opened.find((item) => item.index === activeIndex);
+    if (exact) return exact.tab;
+    const next = opened.find((item) => item.index > activeIndex);
+    if (next) return next.tab;
+    return opened[opened.length - 1].tab;
+  }
+
+  async function restoreOpenTabs() {
+    const saved = readSavedTabs();
+    if (!saved || !saved.tabs.length) return;
+    state.restoring = true;
+    const opened = [];
+    let keepStored = false;
+    try {
+      for (let i = 0; i < saved.tabs.length; i++) {
+        const rec = saved.tabs[i];
+        if (!validSavedTab(rec)) continue;
+        try {
+          const result = await reopenSaved(rec);
+          if (result !== "opened") continue;
+          const tab = findOpenTab(rec);
+          if (tab) opened.push({ index: i, tab });
+        } catch {
+          keepStored = true;
+        }
+      }
+      const activeIndex = Number.isInteger(saved.active) ? saved.active : 0;
+      const chosen = pickRestored(activeIndex, opened);
+      if (chosen) activate(chosen);
+    } finally {
+      state.restoring = false;
+    }
+    if (!keepStored) persistTabs();
+  }
+
+  async function boot() {
+    const baseline = api("/api/control").then((control) => {
+      state.lastSeq = Number(control && control.seq) || 0;
+    }).catch(() => {});
+    try {
+      await restoreOpenTabs();
+    } catch (err) {
+      state.status = err.message || "Could not restore tabs";
+      els.status.textContent = state.status;
+    }
+    await baseline;
+    loop();
+  }
+
+  els.editor.addEventListener("input", () => {
+    const tab = state.active;
+    if (!tab || tab.kind !== "text") return;
+    tab.content = els.editor.value;
+    tab.dirty = tab.content !== tab.savedContent;
+    tab.lineCount = Math.max(1, tab.content.split("\n").length);
+    if (els.gutterInner.childElementCount !== tab.lineCount) renderGutter();
+    if (isMarkdownFile(tab.file)) {
+      tab.mdBlocks = new Set();
+      tab.mdBlockUntil = 0;
+      if (tab.mdView !== "edit") renderPreview();
+    }
+    renderTabs();
+  });
+  els.mdModes.addEventListener("click", (event) => {
+    const btn = event.target.closest("button");
+    if (!btn || !els.mdModes.contains(btn)) return;
+    setMdView(btn.dataset.mode);
+  });
+  els.editor.addEventListener("scroll", syncScroll);
+  els.saveBtn.addEventListener("click", () => saveActive().catch((err) => showBanner(err.message, "warn", 5)));
+  els.reloadDisk.addEventListener("click", reloadFromDisk);
+  els.keepMine.addEventListener("click", keepMine);
+  els.readyDismiss.addEventListener("click", () => { els.ready.hidden = true; });
+  els.noteForm.addEventListener("submit", (event) => addNote(event).catch((err) => showBanner(err.message, "warn", 5)));
+  els.imageWrap.addEventListener("click", (event) => {
+    const tab = state.active;
+    if (!tab || tab.kind !== "image") return;
+    if (tab.zoomed && event.target === els.imageWrap) return;
+    tab.zoomed = !tab.zoomed;
+    if (!tab.zoomed) {
+      tab.scrollLeft = 0;
+      tab.scrollTop = 0;
+    }
+    applyImageZoom(tab);
+  });
+  els.imageWrap.addEventListener("scroll", () => {
+    const tab = state.active;
+    if (!tab || tab.kind !== "image" || !tab.zoomed) return;
+    tab.scrollLeft = els.imageWrap.scrollLeft;
+    tab.scrollTop = els.imageWrap.scrollTop;
+  });
+  els.wave.addEventListener("click", (event) => {
+    const tab = state.active;
+    if (!tab || tab.kind !== "audio" || !els.audio.duration) return;
+    const rect = els.wave.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    els.audio.currentTime = ratio * els.audio.duration;
+    tab.time = els.audio.currentTime;
+    updateNoteButton();
+    drawWave(tab);
+  });
+  function onTime() {
+    updateNoteButton();
+    const tab = state.active;
+    if (tab && tab.kind === "audio") drawWave(tab);
+  }
+  els.audio.addEventListener("timeupdate", onTime);
+  els.video.addEventListener("timeupdate", onTime);
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.key === "S")) {
+      event.preventDefault();
+      saveActive().catch((err) => showBanner(err.message, "warn", 5));
+    }
+  });
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => {
+      const tab = state.active;
+      if (tab && tab.kind === "audio" && tab.peaks) drawWave(tab);
+    }).observe(els.wave);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

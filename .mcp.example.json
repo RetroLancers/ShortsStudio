@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "shorts-studio": {
+      "command": "node",
+      "args": ["/absolute/path/to/shorts-studio/mcp.js"],
+      "env": {
+        "SHORTS_ROOT": "/absolute/path/to/your/workspace"
+      }
+    }
+  }
+}
