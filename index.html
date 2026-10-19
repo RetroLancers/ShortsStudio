@@ -2892,7 +2892,7 @@
     const [tree, control, reviewData] = await Promise.all([
       api("/api/shorts"),
       api("/api/control"),
-      api("/api/reviews").catch(() => ({ reviews: {} })),
+      api("/api/reviews?lite=1").catch(() => ({ reviews: {} })),
     ]);
     state.root = tree.root || "";
     state.shorts = tree.shorts || [];

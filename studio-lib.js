@@ -646,6 +646,8 @@ function sanitizeReview(value) {
     verdict,
     note,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
+    ...(value.fp && typeof value.fp === "object" ? { fp: value.fp } : {}),
+    ...(typeof value.movedFrom === "string" ? { movedFrom: value.movedFrom, movedAt: value.movedAt || "" } : {}),
   };
 }
 
@@ -687,15 +689,161 @@ async function loadReviewMap() {
   }
 }
 
-async function readReviews(opts) {
-  const map = await loadReviewMap();
-  const reviews = {};
-  for (const [key, value] of Object.entries(map)) {
-    if (matchesReviewFilter(key, opts)) reviews[key] = value;
-  }
-  return { reviews };
+// Fingerprint stored with each review so a moved/renamed file can be found
+// again (same size and sha256; mtime is kept as a hint).
+async function fingerprint(abs) {
+  const stat = await fsp.stat(abs);
+  return { size: stat.size, mtime: Math.round(stat.mtimeMs), sha256: await hashFile(abs) };
 }
 
+function hashFile(abs) {
+  return new Promise((resolve, reject) => {
+    const h = crypto.createHash("sha256");
+    const s = fs.createReadStream(abs);
+    s.on("error", reject);
+    s.on("data", (c) => h.update(c));
+    s.on("end", () => resolve(h.digest("hex")));
+  });
+}
+
+async function walkAll(dir, rel, into) {
+  let entries;
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const ent of entries) {
+    if (ent.name.startsWith(".")) continue;
+    const relChild = rel ? rel + "/" + ent.name : ent.name;
+    const abs = path.join(dir, ent.name);
+    if (ent.isDirectory()) await walkAll(abs, relChild, into);
+    else if (ent.isFile()) into.push({ rel: relChild, abs });
+  }
+}
+
+function keyToAbs(key) {
+  const parts = key.split("/");
+  return path.resolve(getRoot(), ...parts);
+}
+
+async function fileExists(abs) {
+  try {
+    return (await fsp.stat(abs)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+// Move <old>.review.md next to the new location. If the destination already
+// has notes, append the old notes (never overwrite) and keep the old file.
+async function carryTimestampNotes(oldAbs, newAbs) {
+  const src = oldAbs + ".review.md";
+  const dst = newAbs + ".review.md";
+  let text;
+  try {
+    text = await fsp.readFile(src, "utf8");
+  } catch {
+    return null;
+  }
+  if (!(await fileExists(dst))) {
+    try {
+      await fsp.rename(src, dst);
+      return "moved";
+    } catch {
+      await fsp.copyFile(src, dst, fs.constants.COPYFILE_EXCL);
+      return "copied";
+    }
+  }
+  const existing = await fsp.readFile(dst, "utf8");
+  if (existing.includes(text.trim())) return "already-present";
+  const sep = existing.endsWith("\n") || existing === "" ? "" : "\n";
+  await fsp.appendFile(dst, sep + text, "utf8");
+  return "appended";
+}
+
+const rekeyMisses = new Map(); // key -> time of last failed search
+const REKEY_RETRY_MS = 60_000;
+
+// Re-key reviews whose file no longer exists, by searching the same short for
+// a file with the same size and sha256. Only reviews with a stored fingerprint
+// can be matched. Runs inside the reviews queue.
+async function rekeyMoved(map) {
+  let changed = false;
+  const moves = [];
+  for (const [key, review] of Object.entries(map)) {
+    if (!review.fp || !review.fp.sha256) continue;
+    const oldAbs = keyToAbs(key);
+    if (await fileExists(oldAbs)) continue;
+    const last = rekeyMisses.get(key);
+    if (last && Date.now() - last < REKEY_RETRY_MS) continue;
+    const short = key.split("/")[0];
+    const files = [];
+    await walkAll(path.join(getRoot(), short), "", files);
+    const matches = [];
+    for (const f of files) {
+      const newKey = short + "/" + f.rel;
+      if (newKey === key || map[newKey]) continue;
+      let stat;
+      try {
+        stat = await fsp.stat(f.abs);
+      } catch {
+        continue;
+      }
+      if (stat.size !== review.fp.size) continue;
+      if ((await hashFile(f.abs)) === review.fp.sha256) matches.push({ newKey, abs: f.abs, stat });
+    }
+    let pick = matches.length === 1 ? matches[0] : null;
+    if (!pick && matches.length > 1) {
+      const sameMtime = matches.filter((m) => Math.round(m.stat.mtimeMs) === review.fp.mtime);
+      if (sameMtime.length === 1) pick = sameMtime[0];
+    }
+    if (!pick) {
+      rekeyMisses.set(key, Date.now());
+      continue;
+    }
+    rekeyMisses.delete(key);
+    const notes = await carryTimestampNotes(oldAbs, pick.abs);
+    delete map[key];
+    map[pick.newKey] = Object.assign({}, review, { movedFrom: key, movedAt: new Date().toISOString() });
+    moves.push({ from: key, to: pick.newKey, timestampNotes: notes });
+    changed = true;
+  }
+  if (changed) await writeReviewMap(map);
+  return moves;
+}
+
+async function readReviews(opts) {
+  return enqueueReviews(async () => {
+    const map = await loadReviewMap();
+    const moved = await rekeyMoved(map);
+    const reviews = {};
+    for (const [key, value] of Object.entries(map)) {
+      if (matchesReviewFilter(key, opts)) reviews[key] = value;
+    }
+    const out = { reviews };
+    if (moved.length) out.moved = moved;
+    if (opts && opts.lite) return out;
+    // Every <file>.review.md under SHORTS_ROOT, keyed by the media path.
+    const timestampNotes = {};
+    const files = [];
+    await walkAll(getRoot(), "", files);
+    for (const f of files) {
+      if (!f.rel.endsWith(".review.md")) continue;
+      const key = f.rel.slice(0, -".review.md".length);
+      if (!key.includes("/") || !matchesReviewFilter(key, opts)) continue;
+      let text;
+      try {
+        text = await fsp.readFile(f.abs, "utf8");
+      } catch {
+        continue;
+      }
+      timestampNotes[key] = { text, fileExists: await fileExists(keyToAbs(key)) };
+    }
+    out.timestampNotes = timestampNotes;
+    return out;
+  });
+}
 async function readTimestampNotes(abs) {
   const notesAbs = abs + ".review.md";
   let real = notesAbs;
@@ -718,7 +866,7 @@ async function readTimestampNotes(abs) {
 async function getReview(relPath) {
   const located = posixRelKey(relPath);
   await assertExistingFile(located.abs);
-  const map = await loadReviewMap();
+  const map = (await readReviews({ lite: true })).reviews;
   const timestampNotes = await readTimestampNotes(located.abs);
   return { path: located.key, review: map[located.key] || null, timestampNotes };
 }
@@ -764,13 +912,15 @@ async function setReview(relPath, verdict, note) {
     throw new StudioError(400, "A verdict or a non-empty note is required");
   }
   const located = posixRelKey(relPath);
-  await assertExistingFile(located.abs);
+  const real = await assertExistingFile(located.abs);
+  const fp = await fingerprint(real);
   return enqueueReviews(async () => {
     const map = await loadReviewMap();
     const review = {
       verdict,
       note,
       updatedAt: new Date().toISOString(),
+      fp,
     };
     map[located.key] = review;
     await writeReviewMap(map);

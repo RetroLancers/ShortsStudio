@@ -175,7 +175,7 @@ function register(server) {
     {
       title: "List file reviews",
       description:
-        "Return review status for files (verdict yes, no, or null for a note-only review, plus note and updatedAt). Optional short or prefix filters keys relative to SHORTS_ROOT (forward slashes, for example my-short or my-short/vo).",
+        "Return review status for files (verdict yes, no, or null for a note-only review, plus note and updatedAt). Optional short or prefix filters keys relative to SHORTS_ROOT (forward slashes, for example my-short or my-short/vo). Also returns timestampNotes: every <file>.review.md, keyed by the media path, with its text and whether the media file still exists. Reviews whose file was moved or renamed are re-keyed to the new path (matched by size and sha256) and listed in moved.",
       inputSchema: {
         short: z.string().optional().describe("Only reviews whose path starts with this short folder"),
         prefix: z.string().optional().describe("Only reviews whose path equals this prefix or is under it"),

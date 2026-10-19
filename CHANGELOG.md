@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Folder rows (playlist, file list, and image thumbnails) have a note field that autosaves on blur, Enter, and after a short pause, with a per-row Saved or Error status. Yes / No toggle and send that note. Saving a row updates it in place so typing keeps focus.
 - A note with no verdict shows a note badge, and its tooltip is the note. **Unreviewed only** treats a file as reviewed only when it has a Yes or No verdict, so a note-only file stays visible.
 - `GET /api/reviews?path=` and MCP `get_review` include `timestampNotes`, the text of the sibling `<file>.review.md`, or `null`. The media pane heading names that file so timestamped notes are distinct from the review note.
+- The full `GET /api/reviews` list and MCP `get_reviews` include `timestampNotes` for every `<file>.review.md`, including notes whose media file no longer exists. `?lite=1` skips them; the page polls with it.
+- Reviews keep a size/mtime/sha256 fingerprint. A reviewed file that is moved or renamed within its short is re-keyed to the new path on the next read (`movedFrom`, `movedAt`, and a `moved` list in the response), and its `<file>.review.md` is moved along, or appended to existing notes at the new path without overwriting.
 
 ## [1.0.0] - 2026-10-19
 

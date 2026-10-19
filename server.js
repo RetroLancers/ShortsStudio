@@ -206,7 +206,15 @@ async function route(req, res) {
     if (req.method === "GET") {
       const reviewPath = url.searchParams.get("path");
       if (reviewPath == null || reviewPath === "") {
-        sendJson(res, 200, await lib.readReviews());
+        sendJson(
+          res,
+          200,
+          await lib.readReviews({
+            lite: url.searchParams.get("lite") === "1",
+            short: url.searchParams.get("short"),
+            prefix: url.searchParams.get("prefix"),
+          })
+        );
         return;
       }
       sendJson(res, 200, await lib.getReview(reviewPath));

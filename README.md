@@ -219,13 +219,21 @@ curl http://localhost:5178/api/reviews
     "my-short/vo/line01.wav": {
       "verdict": "yes",
       "note": "keep this take",
-      "updatedAt": "2026-04-08T15:02:11.000Z"
+      "updatedAt": "2026-04-08T15:02:11.000Z",
+      "fp": { "size": 48000, "mtime": 1775660531000, "sha256": "..." }
     }
+  },
+  "timestampNotes": {
+    "my-short/vo/line01.wav": { "text": "- [0:12] tighten the cadence here\n", "fileExists": true }
   }
 }
 ```
 
 Keys are paths relative to `SHORTS_ROOT` with forward slashes (`<short>/<file>`).
+
+- `timestampNotes` lists every `<file>.review.md` under `SHORTS_ROOT`, keyed by the media path, with its text and whether the media file still exists (so notes left behind after a move are still visible).
+- Optional `?short=` or `?prefix=` filters both maps. `?lite=1` skips `timestampNotes` (the page polls with it).
+- Each review stores a fingerprint (`fp`: size, mtime, sha256) when it is saved. If the file is later moved or renamed inside the same short, the next read finds it again by size and sha256 (mtime breaks ties), re-keys the review to the new path (adding `movedFrom` and `movedAt`), and reports it in `moved`. Its `<file>.review.md` goes along: it is moved if the new location has none, otherwise its text is appended to the existing notes (never overwritten) and the old file is kept. Reviews saved before fingerprints existed are not re-keyed. A failed search is retried after a minute.
 
 ### `GET /api/reviews?path=`
 
@@ -233,7 +241,7 @@ Keys are paths relative to `SHORTS_ROOT` with forward slashes (`<short>/<file>`)
 curl "http://localhost:5178/api/reviews?path=my-short/vo/line01.wav"
 ```
 
-Returns `{ "path": "my-short/vo/line01.wav", "review": { ... }, "timestampNotes": "- [0:12] tighten the cadence here\n" }`. `review` is `null` when none is stored. `review.verdict` is `"yes"`, `"no"`, or `null` (a note with no verdict). `timestampNotes` is the text of the sibling `<file>.review.md`, or `null` if that file does not exist. `readReviews` (the list with no `path`) does not include `timestampNotes`. The file must exist inside `SHORTS_ROOT`.
+Returns `{ "path": "my-short/vo/line01.wav", "review": { ... }, "timestampNotes": "- [0:12] tighten the cadence here\n" }`. `review` is `null` when none is stored. `review.verdict` is `"yes"`, `"no"`, or `null` (a note with no verdict). `timestampNotes` is the text of the sibling `<file>.review.md`, or `null` if that file does not exist. The full list (no `path`) includes `timestampNotes` for every notes file. The file must exist inside `SHORTS_ROOT`.
 
 ### `POST /api/reviews`
 
@@ -303,7 +311,7 @@ Tools:
 | `control` | `{ commands }` bumps `seq` and writes `control.json`. |
 | `open_review` | `{ path, note }` writes one `open_review` command. `path` may be a file or a folder. |
 | `notify_ready` | `{ path, kind, note }` writes one `notify_ready` command. `path` may be a file or a folder. `kind` is `audio`, `short`, or `image`. |
-| `get_reviews` | Optional `{ short }` or `{ prefix }` filter. Returns all matching reviews. |
+| `get_reviews` | Optional `{ short }` or `{ prefix }` filter. Returns all matching reviews, `timestampNotes` for every `<file>.review.md`, and `moved` when a moved file was re-keyed. |
 | `get_review` | `{ path }` for one file (`my-short/vo/line01.wav`). `review` is null when none is stored. Also returns `timestampNotes`, the text of `<file>.review.md`, or null. |
 | `set_review` | `{ path, verdict, note }`. `verdict` is `yes`, `no`, or `null` (optional). A note-only review omits the verdict and sends `note`. |
 | `clear_review` | `{ path }` removes that review. |
