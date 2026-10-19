@@ -175,7 +175,7 @@ function register(server) {
     {
       title: "List file reviews",
       description:
-        "Return review status for files (verdict yes/no, note, updatedAt). Optional short or prefix filters keys relative to SHORTS_ROOT (forward slashes, for example my-short or my-short/vo).",
+        "Return review status for files (verdict yes, no, or null for a note-only review, plus note and updatedAt). Optional short or prefix filters keys relative to SHORTS_ROOT (forward slashes, for example my-short or my-short/vo).",
       inputSchema: {
         short: z.string().optional().describe("Only reviews whose path starts with this short folder"),
         prefix: z.string().optional().describe("Only reviews whose path equals this prefix or is under it"),
@@ -190,7 +190,7 @@ function register(server) {
     {
       title: "Get one file review",
       description:
-        "Return { path, review } for one file. path is short/file using forward slashes. review is null when none is stored. The file must exist inside SHORTS_ROOT.",
+        "Return { path, review, timestampNotes } for one file. path is short/file using forward slashes. review is null when none is stored (verdict may be yes, no, or null when a note-only review is stored). timestampNotes is the text of the sibling <file>.review.md, or null if that file does not exist. The file must exist inside SHORTS_ROOT.",
       inputSchema: {
         path: z.string().describe("short/file, for example my-short/vo/line01.wav"),
       },
@@ -204,11 +204,11 @@ function register(server) {
     {
       title: "Set a file review",
       description:
-        "Record a review for an existing file. path is short/file. verdict is yes or no. note is optional free text. Writes reviews.json.",
+        "Record a review for an existing file. path is short/file. verdict is yes, no, or null (omit or null for a note-only review). note is optional free text, and required when verdict is null. The stored record is exactly the verdict and note sent; a missing verdict does not keep the previous one. Writes reviews.json.",
       inputSchema: {
         path: z.string().describe("short/file, for example my-short/vo/line01.wav"),
-        verdict: z.enum(["yes", "no"]).describe("yes or no"),
-        note: z.string().optional().describe("Free-text note"),
+        verdict: z.enum(["yes", "no"]).nullable().optional().describe("yes, no, or null. Omit or null for a note-only review."),
+        note: z.string().optional().describe("Free-text note. Required when verdict is null."),
       },
     },
     async ({ path: filePath, verdict, note }) => run(() => lib.setReview(filePath, verdict, note || ""))

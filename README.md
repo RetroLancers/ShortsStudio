@@ -11,12 +11,12 @@ What it does:
 - Edits `.md` and `.txt` with line numbers, backups before every save, and conflict detection.
 - Renders markdown with Preview, Edit, and Split views.
 - Plays audio with a waveform, plays video (9:16 friendly), and shows images and folder views of every file type.
-- Filters the sidebar by Video, Audio, Image, Text, and Other, and can hide files that already have a review.
-- Stores a yes/no review (with an optional note and timestamp) for any file in `reviews.json`.
-- Stores timestamped media notes as plain markdown next to each media file (`<media file>.review.md`).
+- Filters the sidebar by Video, Audio, Image, Text, and Other, and can hide files that already have a Yes or No verdict. A note with no verdict still shows.
+- Stores a review for any file in `reviews.json`: verdict `yes`, `no`, or `null`, plus an optional note and timestamp. A review needs a verdict or a non-empty note.
+- Stores timestamped media notes as plain markdown next to each media file (`<media file>.review.md`). That file is separate from the review note.
 - Live-reloads files that agents change and highlights what changed.
 
-Audio, video, and images are read-only. Timestamped notes from a media tab still write `<media file>.review.md`. Yes/no file reviews write `reviews.json`.
+Audio, video, and images are read-only. Timestamped notes from a media tab still write `<media file>.review.md`. File reviews (verdict and review note) write `reviews.json`.
 
 ## Setup
 
@@ -70,7 +70,7 @@ The server listens on `127.0.0.1` and `::1` only.
 | Other | any other file type, listed with `kind` `"other"` |
 | Backups | `<short>/.studio_backups/<filename>.<YYYYMMDD-HHMMSS>.bak` |
 | Media notes | next to the media, e.g. `vo/take3.wav.review.md` |
-| File reviews | `reviews.json` in this folder (`verdict`, `note`, `updatedAt`, keyed by `short/file`) |
+| File reviews | `reviews.json` in this folder (`verdict` `yes`, `no`, or `null`, `note`, `updatedAt`, keyed by `short/file`) |
 | Viewer commands | `control.json` in this folder |
 
 Hidden folders (names starting with `.`) are not listed. That keeps `.studio_backups` out of the sidebar. Unknown file types are listed as Other.
@@ -81,7 +81,7 @@ Nested text backups use the relative path with slashes turned into `__`:
 Projects are ordered by the newest `.md` or `.txt` modification time. A folder with only media sorts last.
 ## Page
 
-The sidebar lists projects, newest first. Toggle chips filter **Video**, **Audio**, **Image**, **Text**, and **Other** (stored in `localStorage` as `studio.fileFilters`). **Unreviewed only** hides files that already have a yes/no review (`studio.unreviewedOnly`). Click the caret to expand a project. Click the project name (or a nested folder name) to open a folder view. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab. Drag a tab to reorder it. Close with ×. A dot on a tab means unsaved text edits. A green ✓ or red ✕ on a file is its review verdict; hover for the note.
+The sidebar lists projects, newest first. Toggle chips filter **Video**, **Audio**, **Image**, **Text**, and **Other** (stored in `localStorage` as `studio.fileFilters`). **Unreviewed only** hides files that have a Yes or No verdict (`studio.unreviewedOnly`). A note with no verdict does not count as reviewed, so that file stays in the list. Click the caret to expand a project. Click the project name (or a nested folder name) to open a folder view. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab. Drag a tab to reorder it. Close with ×. A dot on a tab means unsaved text edits. A green ✓ or red ✕ on a file is its review verdict. A note with no verdict shows ✎. Hover a badge for the note.
 
 Text tabs are a textarea with line numbers. **Save** and Ctrl+S write the file. Before every save the server copies the current file into `.studio_backups`. The save sends the hash from when the tab was loaded. If the file changed on disk, the server returns 409 and does not overwrite.
 
@@ -114,15 +114,15 @@ Audio tabs show a player and a waveform drawn with the Web Audio API. Click the 
 
 Image tabs (`.png`, `.jpg`, `.jpeg`, `.webp`) fit the picture to the stage. Click the picture to show it at 100% (one image pixel per CSS pixel). Scroll to pan when it is larger than the stage. Click again to fit.
 
-A folder path opens a folder view of every file sitting directly in that folder (not nested folders). Images are thumbnails (click to open the image tab). Audio files get an inline player. Video files get an inline `<video>` player. `.md` and `.txt` names open a text tab. Other files open a small info view (name, size, modified time). Each item shows its review badge and Yes / No buttons.
+A folder path opens a folder view of every file sitting directly in that folder (not nested folders). Images are thumbnails (click the picture to open the image tab). Audio files get an inline player. Video files get an inline `<video>` player. `.md` and `.txt` names open a text tab. Other files open a small info view (name, size, modified time). Each item shows its review badge, a note field, and Yes / No buttons. The note is saved when you leave the field, press Enter, or stop typing for a moment. The row shows **Saved** or **Error**. Yes and No toggle, and each click saves the current note. Saving a row does not rebuild the folder, so the field keeps what you typed.
 
-When most files in the folder are audio, the view is a playlist: rows ordered by name, each with the file name, an inline player, a review badge, and Yes / No. **Play all** plays each audio file top to bottom and advances on `ended`.
+When most files in the folder are audio, the view is a playlist: rows ordered by name, each with the file name, an inline player, a review badge, a note field, and Yes / No. **Play all** plays each audio file top to bottom and advances on `ended`.
 
 Unknown types open an info view instead of the editor. `/media` still refuses them.
 
-Every file tab (text, media, or other) has a review bar: **Yes** / **No**, a note field, **Save**, **Clear**, and the last-saved timestamp. This is separate from `<media file>.review.md` timestamped notes.
+Every file tab (text, media, or other) has a review bar: **Yes** / **No**, a review note, **Save**, **Clear**, and a status. Yes and No toggle: click the selected one to clear it. **Save** works with a note and no verdict. The note autosaves about 800ms after you type, and again when the field loses focus. Clicking Yes or No saves immediately and sends the current note. The status reads **Unsaved…**, **Saving…**, **Saved** plus the time, or the error in red. Switching tabs or closing the tab waits for that save. Closing the browser warns if a review note is still unsaved or a save is in flight. This review note is separate from `<media file>.review.md` timestamped notes.
 
-On an audio or video tab, **Add note @ 0:12** appends a line to `<media file>.review.md`:
+On an audio or video tab, the side pane is labelled **Timestamped notes (saved to `<file>.review.md`)**. **Add note @ 0:12** appends a line to that file:
 
 ```md
 - [0:12] tighten the cadence here
@@ -233,7 +233,7 @@ Keys are paths relative to `SHORTS_ROOT` with forward slashes (`<short>/<file>`)
 curl "http://localhost:5178/api/reviews?path=my-short/vo/line01.wav"
 ```
 
-Returns `{ "path": "my-short/vo/line01.wav", "review": { ... } }`. `review` is `null` when none is stored. The file must exist inside `SHORTS_ROOT`.
+Returns `{ "path": "my-short/vo/line01.wav", "review": { ... }, "timestampNotes": "- [0:12] tighten the cadence here\n" }`. `review` is `null` when none is stored. `review.verdict` is `"yes"`, `"no"`, or `null` (a note with no verdict). `timestampNotes` is the text of the sibling `<file>.review.md`, or `null` if that file does not exist. `readReviews` (the list with no `path`) does not include `timestampNotes`. The file must exist inside `SHORTS_ROOT`.
 
 ### `POST /api/reviews`
 
@@ -241,7 +241,11 @@ Returns `{ "path": "my-short/vo/line01.wav", "review": { ... } }`. `review` is `
 curl -X POST http://localhost:5178/api/reviews -H "Content-Type: application/json" -d "{\"path\":\"my-short/vo/line01.wav\",\"verdict\":\"yes\",\"note\":\"keep this take\"}"
 ```
 
-`verdict` is `"yes"` or `"no"`. `note` is optional free text. Writes `reviews.json` atomically (temp file + rename) and serializes writes. Response: `{ "path", "review" }`.
+`verdict` is `"yes"`, `"no"`, or `null`. Omit it, or send `""`, and it is stored as `null`. `note` is optional free text, and required when `verdict` is null: the server returns **400** if both are missing. The stored record is exactly the verdict and note in the body. A missing verdict does not keep the previous one. Writes `reviews.json` atomically (temp file + rename) and serializes writes. Response: `{ "path", "review" }`.
+
+```sh
+curl -X POST http://localhost:5178/api/reviews -H "Content-Type: application/json" -d "{\"path\":\"my-short/vo/line01.wav\",\"verdict\":null,\"note\":\"listen again\"}"
+```
 
 Clear with `{ "path": "my-short/vo/line01.wav", "clear": true }` or with DELETE.
 
@@ -300,8 +304,8 @@ Tools:
 | `open_review` | `{ path, note }` writes one `open_review` command. `path` may be a file or a folder. |
 | `notify_ready` | `{ path, kind, note }` writes one `notify_ready` command. `path` may be a file or a folder. `kind` is `audio`, `short`, or `image`. |
 | `get_reviews` | Optional `{ short }` or `{ prefix }` filter. Returns all matching reviews. |
-| `get_review` | `{ path }` for one file (`my-short/vo/line01.wav`). `review` is null when none is stored. |
-| `set_review` | `{ path, verdict, note }` records yes/no plus an optional note. |
+| `get_review` | `{ path }` for one file (`my-short/vo/line01.wav`). `review` is null when none is stored. Also returns `timestampNotes`, the text of `<file>.review.md`, or null. |
+| `set_review` | `{ path, verdict, note }`. `verdict` is `yes`, `no`, or `null` (optional). A note-only review omits the verdict and sends `note`. |
 | `clear_review` | `{ path }` removes that review. |
 
 To register it, copy `.mcp.example.json` to `.mcp.json` (gitignored) and fill in your paths:

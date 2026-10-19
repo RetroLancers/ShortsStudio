@@ -2,9 +2,10 @@
 // Text files (.md, .txt) can be saved. Each save copies the current file into
 // <short>/.studio_backups/ first. Media (audio, video, images) is read-only.
 // Unknown types are listed with kind "other". The only media-mode write is
-// <mediafile>.review.md, a normal text file next to the media. File review
-// status (yes/no + note) lives in reviews.json. Add an extension to TEXT_EXT /
-// AUDIO_EXT / VIDEO_EXT / IMAGE_EXT to support a new type.
+// <mediafile>.review.md, a normal text file next to the media (timestamped
+// notes). File review status lives in reviews.json: verdict "yes", "no", or
+// null, plus a note. A review needs a verdict or a non-empty note. Add an
+// extension to TEXT_EXT / AUDIO_EXT / VIDEO_EXT / IMAGE_EXT to support a new type.
 
 const fs = require("fs");
 const fsp = require("fs/promises");
@@ -636,10 +637,14 @@ async function assertExistingFile(abs) {
 
 function sanitizeReview(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  if (value.verdict !== "yes" && value.verdict !== "no") return null;
+  let verdict = null;
+  if (value.verdict === "yes" || value.verdict === "no") verdict = value.verdict;
+  else if (value.verdict != null && value.verdict !== "") return null;
+  const note = typeof value.note === "string" ? value.note : "";
+  if (verdict == null && note.trim() === "") return null;
   return {
-    verdict: value.verdict,
-    note: typeof value.note === "string" ? value.note : "",
+    verdict,
+    note,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
   };
 }
@@ -691,11 +696,31 @@ async function readReviews(opts) {
   return { reviews };
 }
 
+async function readTimestampNotes(abs) {
+  const notesAbs = abs + ".review.md";
+  let real = notesAbs;
+  try {
+    real = await assertRealInside(notesAbs);
+  } catch (err) {
+    if (err instanceof StudioError) return null;
+    throw err;
+  }
+  try {
+    const stat = await fsp.stat(real);
+    if (!stat.isFile()) return null;
+    return await fsp.readFile(real, "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT" || err.code === "ENOTDIR") return null;
+    throw err;
+  }
+}
+
 async function getReview(relPath) {
   const located = posixRelKey(relPath);
   await assertExistingFile(located.abs);
   const map = await loadReviewMap();
-  return { path: located.key, review: map[located.key] || null };
+  const timestampNotes = await readTimestampNotes(located.abs);
+  return { path: located.key, review: map[located.key] || null, timestampNotes };
 }
 
 let reviewsQueue = Promise.resolve();
@@ -722,15 +747,21 @@ async function writeReviewMap(map) {
   }
 }
 
+function normalizeVerdict(verdict) {
+  if (verdict == null || verdict === "") return null;
+  if (verdict === "yes" || verdict === "no") return verdict;
+  throw new StudioError(400, 'verdict must be "yes", "no", or null');
+}
+
 async function setReview(relPath, verdict, note) {
-  if (verdict !== "yes" && verdict !== "no") {
-    throw new StudioError(400, 'verdict must be "yes" or "no"');
-  }
-  if (note != null && typeof note !== "string") {
-    throw new StudioError(400, "note must be a string");
-  }
-  if (typeof note === "string" && note.length > 8000) {
-    throw new StudioError(413, "note too large");
+  // The stored record is exactly this post. A missing verdict does not keep
+  // the previous one; callers send the verdict they want stored.
+  verdict = normalizeVerdict(verdict);
+  if (note == null) note = "";
+  else if (typeof note !== "string") throw new StudioError(400, "note must be a string");
+  if (note.length > 8000) throw new StudioError(413, "note too large");
+  if (verdict == null && note.trim() === "") {
+    throw new StudioError(400, "A verdict or a non-empty note is required");
   }
   const located = posixRelKey(relPath);
   await assertExistingFile(located.abs);
@@ -738,7 +769,7 @@ async function setReview(relPath, verdict, note) {
     const map = await loadReviewMap();
     const review = {
       verdict,
-      note: note == null ? "" : note,
+      note,
       updatedAt: new Date().toISOString(),
     };
     map[located.key] = review;

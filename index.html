@@ -24,7 +24,7 @@
     color: var(--text);
     font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
   }
-  button, textarea { font: inherit; color: inherit; }
+  button, textarea, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
   #app { display: flex; height: 100%; min-height: 0; }
   aside#side {
@@ -90,6 +90,7 @@
   }
   .rev-badge.yes { color: var(--ok); }
   .rev-badge.no { color: var(--danger); }
+  .rev-badge.note { color: var(--amber); width: auto; min-width: 16px; }
   #filters {
     display: flex;
     flex-wrap: wrap;
@@ -467,6 +468,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }
   .folder-item .name, .playlist-row .name {
     flex: 1;
@@ -486,6 +488,31 @@
     max-height: 200px;
     background: #000;
     border-radius: 4px;
+  }
+  .rev-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .thumb .rev-controls { flex: 1 1 100%; }
+  .row-note {
+    flex: 1;
+    min-width: 72px;
+    height: 26px;
+    background: #101218;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 6px;
+  }
+  .row-note-status { font-size: 11px; flex: none; }
+  .row-note-status.error { color: var(--danger); }
+  .thumb-open {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    width: 100%;
   }
   .quick-rev { display: flex; gap: 4px; flex: none; }
   .quick-rev button {
@@ -527,7 +554,9 @@
     border-radius: 6px;
     padding: 6px 8px;
   }
-  #reviewWhen { font-size: 11px; }
+  #reviewWhen, #reviewStatus { font-size: 12px; }
+  #reviewStatus.error { color: var(--danger); }
+  #reviewStatus.unsaved { color: var(--amber); }
   #infoPane { overflow: auto; padding: 24px 28px; }
   #infoPane h2 { margin: 0 0 12px; font-size: 18px; word-break: break-all; }
   #infoPane dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin: 0; }
@@ -543,7 +572,7 @@
     background: #14171e;
   }
   #notesPane header { padding: 12px 12px 6px; }
-  #notesPane h2 { margin: 0; font-size: 14px; }
+  #notesPane h2 { margin: 0; font-size: 13px; line-height: 1.35; word-break: break-word; }
   #reviewFile { margin: 4px 0 0; color: var(--muted); font-size: 11px; word-break: break-all; }
   #noteList { flex: 1; overflow: auto; padding: 6px; }
   .note {
@@ -605,7 +634,7 @@
       <button type="button" class="chip on" data-filter="text">Text</button>
       <button type="button" class="chip on" data-filter="other">Other</button>
     </div>
-    <label id="unreviewedRow">
+    <label id="unreviewedRow" title="Hides files that have a Yes or No verdict. A note with no verdict stays in the list.">
       <input type="checkbox" id="unreviewedOnly"> Unreviewed only
     </label>
     <div id="shortList"></div>
@@ -641,6 +670,7 @@
       <textarea id="reviewNote" rows="1" placeholder="Note" aria-label="Review note"></textarea>
       <button type="button" id="reviewSave">Save</button>
       <button type="button" id="reviewClear">Clear</button>
+      <span id="reviewStatus"></span>
       <span id="reviewWhen" class="muted"></span>
     </div>
     <section id="empty" class="pane">Open a file from the sidebar. Ctrl+S saves.</section>
@@ -664,8 +694,8 @@
       </div>
       <aside id="notesPane">
         <header>
-          <h2>Review notes</h2>
-          <p id="reviewFile"></p>
+          <h2 id="notesHeading">Timestamped notes</h2>
+          <p id="reviewFile">Separate from the review note in the bar. Saved beside the media file.</p>
         </header>
         <div id="noteList"></div>
         <form id="noteForm">
@@ -696,6 +726,7 @@
 <script>
 (function () {
   const POLL_MS = 1500;
+  const REVIEW_AUTOSAVE_MS = 800;
   const els = {
     rootLabel: document.getElementById("rootLabel"),
     shortList: document.getElementById("shortList"),
@@ -745,7 +776,9 @@
     reviewNote: document.getElementById("reviewNote"),
     reviewSave: document.getElementById("reviewSave"),
     reviewClear: document.getElementById("reviewClear"),
+    reviewStatus: document.getElementById("reviewStatus"),
     reviewWhen: document.getElementById("reviewWhen"),
+    notesHeading: document.getElementById("notesHeading"),
     reviewFile: document.getElementById("reviewFile"),
     noteList: document.getElementById("noteList"),
     noteForm: document.getElementById("noteForm"),
@@ -769,6 +802,9 @@
     filters: { video: true, audio: true, image: true, text: true, other: true },
     unreviewedOnly: false,
     reviewDraftDirty: false,
+    reviewSaving: false,
+    reviewSaveTimer: null,
+    galleryStale: false,
     playAll: null,
   };
 
@@ -776,6 +812,21 @@
   const FILTERS_KEY = "studio.fileFilters";
   const UNREVIEWED_KEY = "studio.unreviewedOnly";
   let dragTab = null;
+  let uiQueue = Promise.resolve();
+  let reviewChain = Promise.resolve();
+  const rowNoteState = { timers: new Map(), dirty: new Set(), saving: new Set(), queues: new Map() };
+
+  function enqueueUi(fn) {
+    const run = uiQueue.then(fn, fn);
+    uiQueue = run.then(() => {}, () => {});
+    return run;
+  }
+
+  function enqueueReview(fn) {
+    const run = reviewChain.then(fn, fn);
+    reviewChain = run.then(() => {}, () => {});
+    return run;
+  }
 
   function showBanner(text, level, timeoutSec) {
     if (!text) return;
@@ -923,13 +974,37 @@
     els.unreviewedOnly.checked = Boolean(state.unreviewedOnly);
   }
 
+  function reviewVerdict(review) {
+    if (!review) return null;
+    return review.verdict === "yes" || review.verdict === "no" ? review.verdict : null;
+  }
+
+  function reviewNoteText(review) {
+    return review && typeof review.note === "string" ? review.note : "";
+  }
+
+  function reviewHasVerdict(review) {
+    return reviewVerdict(review) != null;
+  }
+
   function appendReviewBadge(parent, short, file) {
     const review = reviewOf(short, file);
     if (!review) return;
     const badge = document.createElement("span");
-    badge.className = "rev-badge " + review.verdict;
-    badge.textContent = review.verdict === "yes" ? "✓" : "✕";
-    badge.title = (review.note ? review.note + " — " : "") + (review.updatedAt || review.verdict);
+    const verdict = reviewVerdict(review);
+    if (verdict === "yes") {
+      badge.className = "rev-badge yes";
+      badge.textContent = "✓";
+    } else if (verdict === "no") {
+      badge.className = "rev-badge no";
+      badge.textContent = "✕";
+    } else if (reviewNoteText(review).trim()) {
+      badge.className = "rev-badge note";
+      badge.textContent = "✎";
+    } else {
+      return;
+    }
+    badge.title = reviewNoteText(review) || review.updatedAt || verdict || "";
     parent.append(badge);
   }
 
@@ -1156,7 +1231,7 @@
   function fileVisible(short, item) {
     const kind = item.kind || "text";
     if (!state.filters[kind]) return false;
-    if (state.unreviewedOnly && reviewOf(short, item.name)) return false;
+    if (state.unreviewedOnly && reviewHasVerdict(reviewOf(short, item.name))) return false;
     return true;
   }
 
@@ -1377,6 +1452,10 @@
   }
 
   function activate(tab) {
+    return enqueueUi(() => activateBody(tab));
+  }
+
+  async function activateBody(tab) {
     if (state.active === tab) {
       const prevMode = els.textPane.dataset.view || "";
       renderTabs();
@@ -1394,8 +1473,11 @@
       return;
     }
     stashText();
+    if (state.active && state.active !== tab && fileTabActive()) {
+      const ok = await flushReviewDraft();
+      if (!ok && state.reviewDraftDirty) return;
+    }
     pauseMedia();
-    state.reviewDraftDirty = false;
     state.active = tab;
     renderTabs();
     updateConflict();
@@ -1471,6 +1553,14 @@
   }
 
   function closeTab(tab) {
+    return enqueueUi(() => closeTabBody(tab));
+  }
+
+  async function closeTabBody(tab) {
+    if (state.active === tab && fileTabActive()) {
+      const ok = await flushReviewDraft();
+      if (!ok && state.reviewDraftDirty) return;
+    }
     if (state.active === tab) {
       pauseMedia();
       state.active = null;
@@ -1478,7 +1568,7 @@
     const index = state.tabs.indexOf(tab);
     if (index >= 0) state.tabs.splice(index, 1);
     if (!state.active && state.tabs.length) {
-      activate(state.tabs[Math.max(0, index - 1)]);
+      await activateBody(state.tabs[Math.max(0, index - 1)]);
     } else if (!state.tabs.length) {
       state.active = null;
       showPane("empty");
@@ -1493,11 +1583,21 @@
   }
 
   function closeMatch(short, file) {
-    const found = state.tabs.filter((tab) => tab.short === short && tab.file === file);
-    for (const tab of found) closeTab(tab);
+    return enqueueUi(async () => {
+      const found = state.tabs.filter((tab) => tab.short === short && tab.file === file);
+      for (const tab of found) await closeTabBody(tab);
+    });
   }
 
   function closeAll() {
+    return enqueueUi(() => closeAllBody());
+  }
+
+  async function closeAllBody() {
+    if (fileTabActive()) {
+      const ok = await flushReviewDraft();
+      if (!ok && state.reviewDraftDirty) return;
+    }
     if (state.active) pauseMedia();
     state.tabs = [];
     state.active = null;
@@ -1579,7 +1679,7 @@
     }
     if (opts && opts.line && isMarkdownFile(file) && tab.mdView === "preview") tab.mdView = "split";
     if (!(opts && opts.restore)) {
-      activate(tab);
+      await activate(tab);
       renderSidebar();
     }
     if (opts && opts.line) {
@@ -1632,7 +1732,7 @@
       await reloadNotes(tab);
     }
     if (!(opts && opts.restore)) {
-      activate(tab);
+      await activate(tab);
       renderSidebar();
     }
     persistTabs();
@@ -1681,7 +1781,7 @@
       tab.images = tab.files.filter((item) => item.kind === "image");
     }
     if (!(opts && opts.restore)) {
-      activate(tab);
+      await activate(tab);
       renderSidebar();
     }
     persistTabs();
@@ -1740,6 +1840,162 @@
     playAllAt(tab, 0);
   }
 
+  function galleryNotesBusy() {
+    const el = document.activeElement;
+    if (el && el.classList && el.classList.contains("row-note")) return true;
+    if (rowNoteState.dirty.size || rowNoteState.saving.size) return true;
+    return false;
+  }
+
+  function maybeRenderGallery(tab) {
+    if (!tab || tab.kind !== "gallery" || state.active !== tab) return;
+    if (galleryNotesBusy()) {
+      state.galleryStale = true;
+      return;
+    }
+    state.galleryStale = false;
+    renderGallery(tab);
+  }
+
+  function rowVerdict(row) {
+    const yes = row.querySelector(".quick-rev button.yes");
+    const no = row.querySelector(".quick-rev button.no");
+    if (yes && yes.classList.contains("on")) return "yes";
+    if (no && no.classList.contains("on")) return "no";
+    return null;
+  }
+
+  function paintRowReview(row, short, file) {
+    const slot = row.querySelector(".badge-slot");
+    if (slot) {
+      slot.replaceChildren();
+      appendReviewBadge(slot, short, file);
+    }
+    const review = reviewOf(short, file);
+    const yes = row.querySelector(".quick-rev button.yes");
+    const no = row.querySelector(".quick-rev button.no");
+    if (yes) yes.className = review && review.verdict === "yes" ? "yes on" : "yes";
+    if (no) no.className = review && review.verdict === "no" ? "no on" : "no";
+    const input = row.querySelector(".row-note");
+    const key = reviewKey(short, file);
+    if (input && document.activeElement !== input && !rowNoteState.dirty.has(key)) {
+      input.value = reviewNoteText(review);
+    }
+  }
+
+  function enqueueRowSave(short, file, row) {
+    const key = reviewKey(short, file);
+    const prev = rowNoteState.queues.get(key) || Promise.resolve();
+    const run = prev.then(() => saveRowReviewBody(short, file, row));
+    rowNoteState.queues.set(key, run.then(() => {}, () => {}));
+    return run;
+  }
+
+  async function saveRowReviewBody(short, file, row) {
+    if (!row.isConnected) return;
+    const key = reviewKey(short, file);
+    const timer = rowNoteState.timers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      rowNoteState.timers.delete(key);
+    }
+    const input = row.querySelector(".row-note");
+    const status = row.querySelector(".row-note-status");
+    const verdict = rowVerdict(row);
+    const note = input ? input.value : "";
+    const review = reviewOf(short, file);
+    const unchanged = reviewVerdict(review) === verdict && reviewNoteText(review) === note;
+    if (unchanged) {
+      rowNoteState.dirty.delete(key);
+      return;
+    }
+    if (verdict == null && note.trim() === "" && !review) {
+      rowNoteState.dirty.delete(key);
+      return;
+    }
+    rowNoteState.saving.add(key);
+    try {
+      if (verdict == null && note.trim() === "") {
+        await clearReviewFor(short, file, { skipGalleryRender: true, skipBarSync: true });
+      } else {
+        await saveReviewFor(short, file, verdict, note, { skipGalleryRender: true, skipBarSync: true });
+      }
+      const nowNote = input ? input.value : "";
+      const nowVerdict = rowVerdict(row);
+      if (nowNote !== note || nowVerdict !== verdict) {
+        rowNoteState.dirty.add(key);
+        enqueueRowSave(short, file, row);
+      } else {
+        rowNoteState.dirty.delete(key);
+        if (status) {
+          status.classList.remove("error");
+          status.textContent = "Saved";
+          status.title = "";
+        }
+        paintRowReview(row, short, file);
+      }
+    } catch (err) {
+      if (status) {
+        status.classList.add("error");
+        status.textContent = "Error";
+        status.title = err.message || "Could not save review";
+      }
+      showBanner(err.message || "Could not save review", "warn", 5);
+    } finally {
+      rowNoteState.saving.delete(key);
+    }
+  }
+
+  function scheduleRowNote(short, file, row) {
+    const key = reviewKey(short, file);
+    rowNoteState.dirty.add(key);
+    const status = row.querySelector(".row-note-status");
+    if (status) {
+      status.classList.remove("error");
+      status.textContent = "";
+      status.title = "";
+    }
+    const prev = rowNoteState.timers.get(key);
+    if (prev) clearTimeout(prev);
+    rowNoteState.timers.set(key, setTimeout(() => {
+      rowNoteState.timers.delete(key);
+      enqueueRowSave(short, file, row).catch((err) => showBanner(err.message, "warn", 5));
+    }, REVIEW_AUTOSAVE_MS));
+  }
+
+  function wireRowNote(input, short, file) {
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("input", () => {
+      const row = input.closest("[data-rev-file]");
+      if (row) scheduleRowNote(short, file, row);
+    });
+    input.addEventListener("blur", () => {
+      const row = input.closest("[data-rev-file]");
+      const key = reviewKey(short, file);
+      if (!row || !rowNoteState.dirty.has(key)) return;
+      const prev = rowNoteState.timers.get(key);
+      if (prev) {
+        clearTimeout(prev);
+        rowNoteState.timers.delete(key);
+      }
+      enqueueRowSave(short, file, row).catch((err) => showBanner(err.message, "warn", 5));
+    });
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const row = input.closest("[data-rev-file]");
+      if (!row) return;
+      rowNoteState.dirty.add(reviewKey(short, file));
+      const prev = rowNoteState.timers.get(reviewKey(short, file));
+      if (prev) {
+        clearTimeout(prev);
+        rowNoteState.timers.delete(reviewKey(short, file));
+      }
+      enqueueRowSave(short, file, row).catch((err) => showBanner(err.message, "warn", 5));
+    });
+  }
+
   function addQuickReview(parent, short, file) {
     const review = reviewOf(short, file);
     const box = document.createElement("span");
@@ -1747,21 +2003,53 @@
     const yes = document.createElement("button");
     yes.type = "button";
     yes.textContent = "Yes";
-    yes.className = review && review.verdict === "yes" ? "on yes" : "";
+    yes.className = review && review.verdict === "yes" ? "yes on" : "yes";
     const no = document.createElement("button");
     no.type = "button";
     no.textContent = "No";
-    no.className = review && review.verdict === "no" ? "on no" : "";
-    yes.onclick = (event) => {
+    no.className = review && review.verdict === "no" ? "no on" : "no";
+    const toggle = (event, button, other, onVerdict) => {
       event.stopPropagation();
-      saveReviewFor(short, file, "yes", review ? review.note : "").catch((err) => showBanner(err.message, "warn", 5));
+      const row = button.closest("[data-rev-file]");
+      if (!row) return;
+      const turningOff = button.classList.contains("on");
+      const base = button.classList.contains("yes") ? "yes" : "no";
+      button.className = turningOff ? base : (onVerdict === "yes" ? "yes on" : "no on");
+      other.className = other.classList.contains("yes") ? "yes" : "no";
+      const key = reviewKey(short, file);
+      const prev = rowNoteState.timers.get(key);
+      if (prev) {
+        clearTimeout(prev);
+        rowNoteState.timers.delete(key);
+      }
+      rowNoteState.dirty.add(key);
+      enqueueRowSave(short, file, row).catch((err) => showBanner(err.message, "warn", 5));
     };
-    no.onclick = (event) => {
-      event.stopPropagation();
-      saveReviewFor(short, file, "no", review ? review.note : "").catch((err) => showBanner(err.message, "warn", 5));
-    };
+    yes.onclick = (event) => toggle(event, yes, no, "yes");
+    no.onclick = (event) => toggle(event, no, yes, "no");
     box.append(yes, no);
     parent.append(box);
+  }
+
+  function buildReviewControls(short, file) {
+    const wrap = document.createElement("div");
+    wrap.className = "rev-controls";
+    const slot = document.createElement("span");
+    slot.className = "badge-slot";
+    appendReviewBadge(slot, short, file);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "row-note";
+    input.placeholder = "Note";
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", "Review note");
+    input.value = reviewNoteText(reviewOf(short, file));
+    const status = document.createElement("span");
+    status.className = "row-note-status muted";
+    wrap.append(slot, input, status);
+    addQuickReview(wrap, short, file);
+    wireRowNote(input, short, file);
+    return wrap;
   }
 
   function renderGallery(tab) {
@@ -1793,30 +2081,32 @@
   }
 
   function renderImageThumb(tab, item) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "thumb";
+    const card = document.createElement("div");
+    card.className = "thumb";
+    card.dataset.revFile = item.name;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "thumb-open";
     const img = document.createElement("img");
     img.src = mediaUrl(tab.short, item.name);
     img.alt = item.name.split("/").pop();
+    open.append(img);
+    open.onclick = () => {
+      openMedia(tab.short, item.name, "image").catch((err) => showBanner(err.message, "warn", 5));
+    };
     const meta = document.createElement("div");
     meta.className = "thumb-meta";
     const label = document.createElement("span");
     label.textContent = item.name.split("/").pop();
-    meta.append(label);
-    appendReviewBadge(meta, tab.short, item.name);
-    addQuickReview(meta, tab.short, item.name);
-    btn.append(img, meta);
-    btn.onclick = (event) => {
-      if (event.target.closest(".quick-rev")) return;
-      openMedia(tab.short, item.name, "image").catch((err) => showBanner(err.message, "warn", 5));
-    };
-    return btn;
+    meta.append(label, buildReviewControls(tab.short, item.name));
+    card.append(open, meta);
+    return card;
   }
 
   function renderFolderItem(tab, item) {
     const row = document.createElement("div");
     row.className = "folder-item";
+    row.dataset.revFile = item.name;
     const head = document.createElement("div");
     head.className = "folder-item-head";
     const name = document.createElement("button");
@@ -1824,9 +2114,7 @@
     name.className = "name";
     name.textContent = item.name.split("/").pop();
     name.onclick = () => openListedFile(tab.short, item);
-    head.append(name);
-    appendReviewBadge(head, tab.short, item.name);
-    addQuickReview(head, tab.short, item.name);
+    head.append(name, buildReviewControls(tab.short, item.name));
     row.append(head);
     if (item.kind === "audio") {
       const audio = document.createElement("audio");
@@ -1854,8 +2142,8 @@
     name.className = "name";
     name.textContent = item.name.split("/").pop();
     name.onclick = () => openListedFile(tab.short, item);
-    row.append(name);
-    appendReviewBadge(row, tab.short, item.name);
+    row.dataset.revFile = item.name;
+    row.append(name, buildReviewControls(tab.short, item.name));
     if (item.kind === "audio") {
       const audio = document.createElement("audio");
       audio.controls = true;
@@ -1871,7 +2159,6 @@
       video.src = mediaUrl(tab.short, item.name);
       row.append(video);
     }
-    addQuickReview(row, tab.short, item.name);
     return row;
   }
 
@@ -1893,7 +2180,7 @@
       tab.size = meta.size;
     }
     if (!(opts && opts.restore)) {
-      activate(tab);
+      await activate(tab);
       renderSidebar();
     }
     persistTabs();
@@ -2071,7 +2358,8 @@
   }
 
   function renderNotes(tab) {
-    els.reviewFile.textContent = reviewName(tab.file);
+    els.notesHeading.textContent = "Timestamped notes (saved to " + reviewName(tab.file) + ")";
+    els.reviewFile.textContent = "Separate from the review note in the bar.";
     els.noteList.replaceChildren();
     if (!tab.notes.length) {
       const p = document.createElement("p");
@@ -2324,7 +2612,7 @@
     if (sameFiles(live, tab.files || [])) return;
     tab.files = live;
     tab.images = live.filter((item) => item.kind === "image");
-    if (state.active === tab) renderGallery(tab);
+    if (state.active === tab) maybeRenderGallery(tab);
   }
 
   function refreshInfo(tab) {
@@ -2341,71 +2629,186 @@
     return Boolean(tab && tab.kind && tab.kind !== "gallery");
   }
 
+  function barVerdict() {
+    if (els.reviewYes.classList.contains("on")) return "yes";
+    if (els.reviewNo.classList.contains("on")) return "no";
+    return null;
+  }
+
+  function setReviewStatus(kind, detail) {
+    els.reviewStatus.classList.remove("error", "unsaved");
+    if (kind === "unsaved") {
+      els.reviewStatus.textContent = "Unsaved…";
+      els.reviewStatus.classList.add("unsaved");
+    } else if (kind === "saving") {
+      els.reviewStatus.textContent = "Saving…";
+    } else if (kind === "saved") {
+      els.reviewStatus.textContent = "Saved " + (detail || "");
+    } else if (kind === "error") {
+      els.reviewStatus.textContent = detail || "Could not save review";
+      els.reviewStatus.classList.add("error");
+    } else {
+      els.reviewStatus.textContent = "";
+    }
+  }
+
+  function savedLabel(review) {
+    if (!review || !review.updatedAt) return "";
+    const ms = Date.parse(review.updatedAt);
+    return Number.isFinite(ms) ? formatWhen(ms) : review.updatedAt;
+  }
+
   function syncReviewBar() {
     const tab = state.active;
     const show = fileTabActive();
     els.reviewBar.hidden = !show;
     if (!show) return;
-    if (state.reviewDraftDirty) return;
+    if (state.reviewDraftDirty || state.reviewSaving) return;
     const review = reviewOf(tab.short, tab.file);
-    const verdict = review ? review.verdict : "";
+    const verdict = reviewVerdict(review);
     els.reviewYes.classList.toggle("on", verdict === "yes");
     els.reviewNo.classList.toggle("on", verdict === "no");
-    els.reviewNote.value = review ? review.note : "";
-    if (review && review.updatedAt) {
-      const ms = Date.parse(review.updatedAt);
-      els.reviewWhen.textContent = Number.isFinite(ms) ? formatWhen(ms) : review.updatedAt;
-    } else {
-      els.reviewWhen.textContent = "";
-    }
+    const note = reviewNoteText(review);
+    if (els.reviewNote.value !== note) els.reviewNote.value = note;
+    const label = savedLabel(review);
+    els.reviewWhen.textContent = "";
+    if (label) setReviewStatus("saved", label);
+    else setReviewStatus("");
   }
 
-  async function saveReviewFor(short, file, verdict, note) {
+  async function saveReviewFor(short, file, verdict, note, opts) {
+    opts = opts || {};
     const path = reviewKey(short, file);
     const data = await api("/api/reviews", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, verdict, note: note || "" }),
+      body: JSON.stringify({ path, verdict: verdict == null ? null : verdict, note: note || "" }),
     });
-    if (data && data.path) state.reviews[data.path] = data.review;
-    state.reviewDraftDirty = false;
+    if (data && data.path) {
+      if (data.review) state.reviews[data.path] = data.review;
+      else delete state.reviews[data.path];
+    }
     renderSidebar();
-    if (state.active && state.active.kind === "gallery") renderGallery(state.active);
-    else syncReviewBar();
+    if (!opts.skipGalleryRender && state.active && state.active.kind === "gallery") maybeRenderGallery(state.active);
+    if (!opts.skipBarSync) syncReviewBar();
     return data;
   }
 
-  async function clearReviewFor(short, file) {
+  async function clearReviewFor(short, file, opts) {
+    opts = opts || {};
     const path = reviewKey(short, file);
     await api("/api/reviews?path=" + encodeURIComponent(path), { method: "DELETE" });
     delete state.reviews[path];
-    state.reviewDraftDirty = false;
     renderSidebar();
-    if (state.active && state.active.kind === "gallery") renderGallery(state.active);
-    else syncReviewBar();
+    if (!opts.skipGalleryRender && state.active && state.active.kind === "gallery") maybeRenderGallery(state.active);
+    if (!opts.skipBarSync) syncReviewBar();
   }
 
-  async function saveActiveReview() {
-    const tab = state.active;
-    if (!fileTabActive()) return;
-    const verdict = els.reviewYes.classList.contains("on") ? "yes" : els.reviewNo.classList.contains("on") ? "no" : "";
-    if (!verdict) {
-      showBanner("Pick Yes or No before saving a review.", "warn", 4);
-      return;
+  async function flushReviewDraftBody() {
+    if (state.reviewSaveTimer) {
+      clearTimeout(state.reviewSaveTimer);
+      state.reviewSaveTimer = null;
     }
-    await saveReviewFor(tab.short, tab.file, verdict, els.reviewNote.value);
-    showBanner("Review saved", "ok", 2);
+    const tab = state.active;
+    if (!fileTabActive()) return true;
+    const verdict = barVerdict();
+    const note = els.reviewNote.value;
+    const review = reviewOf(tab.short, tab.file);
+    if (reviewVerdict(review) === verdict && reviewNoteText(review) === note) {
+      state.reviewDraftDirty = false;
+      const label = savedLabel(review);
+      if (label) setReviewStatus("saved", label);
+      else setReviewStatus("");
+      return true;
+    }
+    if (verdict == null && note.trim() === "" && !review) {
+      state.reviewDraftDirty = false;
+      setReviewStatus("");
+      return true;
+    }
+    state.reviewSaving = true;
+    setReviewStatus("saving");
+    try {
+      if (verdict == null && note.trim() === "") {
+        await clearReviewFor(tab.short, tab.file, { skipBarSync: true, skipGalleryRender: true });
+      } else {
+        await saveReviewFor(tab.short, tab.file, verdict, note, { skipBarSync: true, skipGalleryRender: true });
+      }
+      if (state.active !== tab || els.reviewNote.value !== note || barVerdict() !== verdict) {
+        state.reviewDraftDirty = true;
+        setReviewStatus("unsaved");
+        return true;
+      }
+      state.reviewDraftDirty = false;
+      state.reviewSaving = false;
+      syncReviewBar();
+      return true;
+    } catch (err) {
+      state.reviewDraftDirty = true;
+      const message = err.message || "Could not save review";
+      setReviewStatus("error", message);
+      showBanner(message, "warn", 5);
+      return false;
+    } finally {
+      state.reviewSaving = false;
+    }
   }
 
-  async function clearActiveReview() {
-    const tab = state.active;
-    if (!fileTabActive()) return;
-    await clearReviewFor(tab.short, tab.file);
-    els.reviewYes.classList.remove("on");
-    els.reviewNo.classList.remove("on");
-    els.reviewNote.value = "";
-    els.reviewWhen.textContent = "";
-    showBanner("Review cleared", "ok", 2);
+  function flushReviewDraft() {
+    return enqueueReview(async () => {
+      let ok = true;
+      for (let i = 0; i < 5; i++) {
+        ok = await flushReviewDraftBody();
+        if (!ok) return false;
+        if (!state.reviewDraftDirty) return true;
+      }
+      return !state.reviewDraftDirty;
+    });
+  }
+
+  function scheduleReviewSave() {
+    state.reviewDraftDirty = true;
+    setReviewStatus("unsaved");
+    if (state.reviewSaveTimer) clearTimeout(state.reviewSaveTimer);
+    state.reviewSaveTimer = setTimeout(() => {
+      state.reviewSaveTimer = null;
+      flushReviewDraft().catch((err) => showBanner(err.message, "warn", 5));
+    }, REVIEW_AUTOSAVE_MS);
+  }
+
+  function toggleBarVerdict(which) {
+    const button = els[which];
+    const other = which === "reviewYes" ? els.reviewNo : els.reviewYes;
+    const wasOn = button.classList.contains("on");
+    button.classList.toggle("on", !wasOn);
+    if (!wasOn) other.classList.remove("on");
+    scheduleReviewSave();
+    if (state.reviewSaveTimer) {
+      clearTimeout(state.reviewSaveTimer);
+      state.reviewSaveTimer = null;
+    }
+    flushReviewDraft().catch((err) => showBanner(err.message, "warn", 5));
+  }
+
+  function clearActiveReview() {
+    return enqueueReview(async () => {
+      if (state.reviewSaveTimer) {
+        clearTimeout(state.reviewSaveTimer);
+        state.reviewSaveTimer = null;
+      }
+      const tab = state.active;
+      if (!fileTabActive()) return;
+      const had = reviewOf(tab.short, tab.file);
+      if (had) await clearReviewFor(tab.short, tab.file, { skipBarSync: true, skipGalleryRender: true });
+      if (state.active !== tab) return;
+      state.reviewDraftDirty = false;
+      els.reviewYes.classList.remove("on");
+      els.reviewNo.classList.remove("on");
+      els.reviewNote.value = "";
+      els.reviewWhen.textContent = "";
+      setReviewStatus("");
+      if (had) showBanner("Review cleared", "ok", 2);
+    });
   }
 
   async function refreshReview(tab) {
@@ -2499,8 +2902,13 @@
     if (sig !== state.treeSig) {
       state.treeSig = sig;
       renderSidebar();
-      if (state.active && state.active.kind === "gallery") renderGallery(state.active);
-      else syncReviewBar();
+      if (state.active && state.active.kind === "gallery") {
+        if (galleryNotesBusy()) state.galleryStale = true;
+        else renderGallery(state.active);
+      } else syncReviewBar();
+    } else if (state.galleryStale && state.active && state.active.kind === "gallery" && !galleryNotesBusy()) {
+      state.galleryStale = false;
+      renderGallery(state.active);
     } else {
       els.rootLabel.textContent = state.root;
       els.status.textContent = state.status;
@@ -2628,7 +3036,7 @@
       }
       const activeIndex = Number.isInteger(saved.active) ? saved.active : 0;
       const chosen = pickRestored(activeIndex, opened);
-      if (chosen) activate(chosen);
+      if (chosen) await activate(chosen);
     } finally {
       state.restoring = false;
     }
@@ -2690,19 +3098,33 @@
     persistFilters();
     renderSidebar();
   });
-  els.reviewYes.addEventListener("click", () => {
-    els.reviewYes.classList.add("on");
-    els.reviewNo.classList.remove("on");
-    state.reviewDraftDirty = true;
+  els.reviewYes.addEventListener("click", () => toggleBarVerdict("reviewYes"));
+  els.reviewNo.addEventListener("click", () => toggleBarVerdict("reviewNo"));
+  els.reviewNote.addEventListener("input", scheduleReviewSave);
+  els.reviewNote.addEventListener("blur", () => {
+    if (!state.reviewDraftDirty && !state.reviewSaving) return;
+    if (state.reviewSaveTimer) {
+      clearTimeout(state.reviewSaveTimer);
+      state.reviewSaveTimer = null;
+    }
+    flushReviewDraft().catch((err) => showBanner(err.message, "warn", 5));
   });
-  els.reviewNo.addEventListener("click", () => {
-    els.reviewNo.classList.add("on");
-    els.reviewYes.classList.remove("on");
+  els.reviewSave.addEventListener("click", () => {
     state.reviewDraftDirty = true;
+    if (state.reviewSaveTimer) {
+      clearTimeout(state.reviewSaveTimer);
+      state.reviewSaveTimer = null;
+    }
+    flushReviewDraft().catch((err) => showBanner(err.message, "warn", 5));
   });
-  els.reviewNote.addEventListener("input", () => { state.reviewDraftDirty = true; });
-  els.reviewSave.addEventListener("click", () => saveActiveReview().catch((err) => showBanner(err.message, "warn", 5)));
   els.reviewClear.addEventListener("click", () => clearActiveReview().catch((err) => showBanner(err.message, "warn", 5)));
+  window.addEventListener("beforeunload", (event) => {
+    const rowBusy = rowNoteState.dirty.size > 0 || rowNoteState.saving.size > 0;
+    if (state.reviewDraftDirty || state.reviewSaving || rowBusy) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
   els.playAllBtn.addEventListener("click", () => {
     const tab = state.active;
     if (!tab || tab.kind !== "gallery") return;
