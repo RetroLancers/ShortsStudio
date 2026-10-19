@@ -26,6 +26,7 @@ Requires Node 18 or newer.
 git clone https://github.com/RetroLancers/ShortsStudio.git
 cd ShortsStudio
 npm install
+npm test   # server, MCP, and path tests
 node server.js
 ```
 
@@ -288,13 +289,13 @@ This is how agents drive the page. The page polls this file every 1.5 seconds. I
 
 | Action | Fields | Effect |
 | --- | --- | --- |
-| `open` | `short`, `file` | Open or focus a tab. `.wav` and `.mp3` open as audio, `.mp4` as video, `.png` `.jpg` `.jpeg` `.webp` as image, `.md` and `.txt` as text, anything else as an info view. |
+| `open` | `short`, `file` (or `path`) | Open or focus a tab. The page resolves the target first: `.wav` and `.mp3` open as audio, `.mp4` as video, `.png` `.jpg` `.jpeg` `.webp` as image, `.md` and `.txt` as text, anything else as an info view. A folder (`file` naming a folder, `short` with no `file`, or a folder `path`) opens the folder view. |
 | `close` | `short`, `file` | Close matching tabs. |
 | `closeAll` | | Close every tab. |
-| `goto` | `short`, `file`, `line`, `highlight` | Open the text file, scroll to the 1-based line. Highlights the line unless `highlight` is false. |
+| `goto` | `short`, `file`, `line`, `highlight` | Open the text file, scroll to the 1-based line. Highlights the line unless `highlight` is false. A media file or folder is opened normally instead (no text read). |
 | `banner` | `text`, `level`, `timeoutSec` | Toast. `level` is `info`, `warn`, or `ok`. Default timeout is 8 seconds. |
-| `open_review` | `path`, `note` | Open a review tab. `path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. An image opens an image tab. A folder opens a folder view of every file in that folder. Shows `note` as a normal banner. A `*.wav.review.md` (or mp3/mp4/png/jpg/jpeg/webp) path opens the media file instead. |
-| `notify_ready` | `path`, `kind`, `note` | Open that review tab (file, image, or folder) and show a prominent **Ready for review** banner until dismissed. `kind` is `audio`, `short`, or `image`. |
+| `open_review` | `path` (or `short` + `file`), `note` | Open a review tab. `path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. An image opens an image tab. A folder opens a folder view of every file in that folder. Shows `note` as a normal banner. A `*.wav.review.md` (or mp3/mp4/png/jpg/jpeg/webp) path opens the media file instead. |
+| `notify_ready` | `path` (or `short` + `file`), `kind`, `note` | Open that review tab (file, image, or folder) and show a prominent **Ready for review** banner until dismissed. `kind` is `audio`, `short`, or `image`; it only labels the banner, so a folder with `kind: "audio"` opens the folder view (audio playlist). |
 ## MCP
 
 `mcp.js` is a stdio MCP server, so agents can list, read, and edit workspace files and push things to your screen. It uses `@modelcontextprotocol/sdk` and `zod` from the local `node_modules`. Do not print to stdout from this process.

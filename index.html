@@ -1634,7 +1634,26 @@
     renderTabs();
   }
 
+  function isTextName(file) {
+    return /\.(md|txt)$/i.test(String(file || ""));
+  }
+
+  // Command target: an explicit path, or short (+ optional file). Resolved by
+  // the server so folders open the folder view and media never hits /api/file.
+  function commandPath(cmd) {
+    if (typeof cmd.path === "string" && cmd.path.trim()) return cmd.path.trim();
+    if (typeof cmd.short === "string" && cmd.short) {
+      const file = typeof cmd.file === "string" ? cmd.file.replace(/^[\\/]+|[\\/]+$/g, "") : "";
+      return file ? cmd.short + "/" + file : cmd.short;
+    }
+    throw new Error("Command needs a path, or a short and file");
+  }
+
   async function openText(short, file, opts) {
+    if (!isTextName(file)) {
+      // Folders and media are not text: open them the right way instead.
+      return openReview(await resolvePath(file ? short + "/" + file : short));
+    }
     state.expanded.add(short);
     let tab = state.tabs.find((item) => item.kind === "text" && item.short === short && item.file === file);
     const data = await api(fileUrl(short, file));
@@ -2678,6 +2697,7 @@
 
   async function saveReviewFor(short, file, verdict, note, opts) {
     opts = opts || {};
+    if (!short || !file) return null;
     const path = reviewKey(short, file);
     const data = await api("/api/reviews", {
       method: "POST",
@@ -2696,6 +2716,7 @@
 
   async function clearReviewFor(short, file, opts) {
     opts = opts || {};
+    if (!short || !file) return;
     const path = reviewKey(short, file);
     await api("/api/reviews?path=" + encodeURIComponent(path), { method: "DELETE" });
     delete state.reviews[path];
@@ -2834,10 +2855,12 @@
   }
 
   async function openReview(loc) {
+    if (!loc || typeof loc.short !== "string") throw new Error("Nothing to open");
     if (loc.kind === "gallery") {
       await openGallery(loc.short, loc.file || "", loc.images, { files: loc.files });
       return;
     }
+    if (!loc.file) throw new Error("Nothing to open in " + loc.short);
     const match = /^(.*\.(wav|mp3|mp4|png|jpg|jpeg|webp))\.review\.md$/i.exec(loc.file);
     if (match) {
       await openMedia(loc.short, match[1], inferMediaKind(match[1]));
@@ -2852,19 +2875,20 @@
 
   async function runCommand(cmd) {
     if (!cmd || typeof cmd.action !== "string") return;
-    if (cmd.action === "open") await openAnything(cmd.short, cmd.file);
+    if (cmd.action === "open") await openReview(await resolvePath(commandPath(cmd)));
     else if (cmd.action === "close") closeMatch(cmd.short, cmd.file);
     else if (cmd.action === "closeAll") closeAll();
     else if (cmd.action === "goto") {
-      await openText(cmd.short, cmd.file, { line: cmd.line, highlight: cmd.highlight !== false });
+      if (isTextName(cmd.file) && !cmd.path) await openText(cmd.short, cmd.file, { line: cmd.line, highlight: cmd.highlight !== false });
+      else await openReview(await resolvePath(commandPath(cmd)));
     } else if (cmd.action === "banner") {
       showBanner(String(cmd.text || ""), cmd.level || "info", cmd.timeoutSec);
     } else if (cmd.action === "open_review") {
-      const loc = await resolvePath(cmd.path);
+      const loc = await resolvePath(commandPath(cmd));
       await openReview(loc);
       if (cmd.note) showBanner(String(cmd.note), "info", 8);
     } else if (cmd.action === "notify_ready") {
-      const loc = await resolvePath(cmd.path);
+      const loc = await resolvePath(commandPath(cmd));
       await openReview(loc);
       showReady(cmd.kind, cmd.note ? String(cmd.note) : "");
     }
@@ -2977,6 +3001,7 @@
     if (typeof rec.file !== "string") return false;
     if (rec.kind !== "text" && rec.kind !== "audio" && rec.kind !== "video" && rec.kind !== "image" && rec.kind !== "gallery" && rec.kind !== "other") return false;
     if (rec.kind !== "gallery" && rec.file.length === 0) return false;
+    if (rec.kind === "text" && !isTextName(rec.file)) return false;
     return true;
   }
 

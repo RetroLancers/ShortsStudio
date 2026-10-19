@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `open`, `goto`, `open_review`, and `notify_ready` commands resolve their target on the server before opening, so a folder (including `short` with no `file`, a folder `file`, or a trailing slash) opens the all-files folder view (audio playlist for audio folders) and media is never read as text. This fixes "Path must be a file inside a short folder", "Cannot read properties of undefined (reading 'split')", and "Only .md and .txt files can be read or written as text" toasts. Saved text tabs that point at non-text paths are dropped on restore.
+- `npm test` runs automated checks for file and folder open/notify over HTTP and MCP, plus an optional headless-browser check (`STUDIO_CHROMIUM` + `playwright-core`).
+
 - A review note can be saved with no Yes/No verdict. `setReview` takes verdict `yes`, `no`, or `null` (`""` and an omitted verdict count as `null`). The server returns 400 unless the post has a verdict or a non-empty note. Records already in `reviews.json` still load.
 - The file review bar autosaves the note (about 800ms after typing, and on blur). Yes and No toggle, and each click saves the current note immediately. Switching or closing a tab waits for a dirty review instead of dropping it. Leaving the page warns when a review draft is unsaved or a save is still in flight.
 - Folder rows (playlist, file list, and image thumbnails) have a note field that autosaves on blur, Enter, and after a short pause, with a per-row Saved or Error status. Yes / No toggle and send that note. Saving a row updates it in place so typing keeps focus.
