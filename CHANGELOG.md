@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Quick open (**Ctrl+K** or **Ctrl+P**, **Cmd** on Mac): fuzzy search across every file, with `type:`, `ext:`, `short:`, `reviewed:`, and `has:note` filters. Arrow keys, Enter, Esc, and click. Matched letters and the review badge show on each row.
+- **Ctrl+click** (**Cmd+click** on Mac) closes a tab, with the same wait for a dirty review as ×.
+- Drag a tab in the strip or the **▾** list to reorder it. The order stays in `studio.openTabs`.
+- Tab strip stays one scrolling row and keeps the active tab in view. Middle-click closes a tab. Right-click opens Close, Close others, Close to the right, and Close all. **▾ N** lists every open tab. Tabs that share a file name show the parent folder.
+- Ready banner quick **Yes** / **No** for a file (keeps the note and dismisses). Folder targets get **Next unreviewed** instead. The banner dismisses when that file gains a verdict.
+- Review shortcuts: Y, N, U, J, K, arrows, Shift+J, period, Esc, and `?`, plus a shortcut help overlay.
+- **Next unreviewed** on the review bar and in the folder toolbar. Folder rows highlight the current file for those keys.
+- `studio-ui-lib.js` (served at `/studio-ui-lib.js`) for tab labels, sibling order, and next unreviewed.
+
 - Sidebar file-type filter chips for Video, Audio, Image, Text, and Other, persisted in `localStorage`.
 - Unreviewed-only sidebar toggle, persisted in `localStorage`.
 - File listing includes unknown types with `kind` `"other"` (in the `media` array).
@@ -22,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking a folder name in the sidebar opens the folder view.
 
 ### Changed
+
+- Visual refresh on the same dark theme: spacing, corners, borders, shadows, type hierarchy, sidebar indent guides, compact review badges, a clearer active tab, shared button styles, and keyboard focus rings.
+- The review bar on `.md` and `.txt` tabs stays out of the way of editing, **Ctrl+S** / **Cmd+S**, and the markdown preview. **Y**, **N**, **U**, **J**, and **K** do not run while the cursor is in the editor. Preview blurs the editor so those keys apply to the review again.
+- The ready banner is one line: kind, note, and actions.
+- Review **Yes** / **No** fill green or red when selected (`aria-pressed`). The note field grows with the text. **Save** is a text button. The status reads **Saved ✓** and the time, **Saving…**, **Unsaved**, or the error in red.
 
 - `GET /api/resolve` still returns `images` for a folder and also returns `files` with a `kind` for each direct child.
 - `/media` still refuses non-media types.

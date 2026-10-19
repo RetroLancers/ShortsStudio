@@ -47,6 +47,24 @@ function get(url) {
   });
 }
 
+function getRaw(url) {
+  return new Promise((resolve, reject) => {
+    http
+      .get("http://127.0.0.1:" + port + url, (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode,
+            type: String(res.headers["content-type"] || ""),
+            body: Buffer.concat(chunks).toString("utf8"),
+          })
+        );
+      })
+      .on("error", reject);
+  });
+}
+
 function readControl() {
   return JSON.parse(fs.readFileSync(env.CONTROL_PATH, "utf8"));
 }
@@ -77,6 +95,13 @@ test.after(async () => {
   if (client) await client.close();
   if (server) server.kill();
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("serves studio-ui-lib.js", async () => {
+  const res = await getRaw("/studio-ui-lib.js");
+  assert.strictEqual(res.status, 200);
+  assert.match(res.type, /javascript/);
+  assert.match(res.body, /nextUnreviewedName/);
 });
 
 test("resolve: folder returns the all-files folder view", async () => {

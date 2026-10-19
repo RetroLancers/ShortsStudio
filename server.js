@@ -10,6 +10,7 @@ const lib = require("./studio-lib");
 const PORT = Number(process.env.PORT || 5178);
 const INDEX_PATH = path.join(__dirname, "index.html");
 const VENDOR_MARKED = path.join(__dirname, "vendor", "marked.umd.js");
+const UI_LIB_PATH = path.join(__dirname, "studio-ui-lib.js");
 const MAX_BODY = 8 * 1024 * 1024;
 
 function sendJson(res, status, body) {
@@ -81,10 +82,10 @@ function serveIndex(res) {
   res.end(html);
 }
 
-function serveVendorMarked(res) {
+function serveJavaScript(res, filePath) {
   let data;
   try {
-    data = fs.readFileSync(VENDOR_MARKED);
+    data = fs.readFileSync(filePath);
   } catch (err) {
     if (err.code === "ENOENT") throw new lib.StudioError(404, "Not found");
     throw err;
@@ -95,6 +96,14 @@ function serveVendorMarked(res) {
     "Cache-Control": "no-store",
   });
   res.end(data);
+}
+
+function serveVendorMarked(res) {
+  serveJavaScript(res, VENDOR_MARKED);
+}
+
+function serveStudioUi(res) {
+  serveJavaScript(res, UI_LIB_PATH);
 }
 
 async function serveMedia(req, res, short, file) {
@@ -196,6 +205,10 @@ async function route(req, res) {
   }
   if (req.method === "GET" && pathName === "/vendor/marked.umd.js") {
     serveVendorMarked(res);
+    return;
+  }
+  if (req.method === "GET" && pathName === "/studio-ui-lib.js") {
+    serveStudioUi(res);
     return;
   }
   if ((req.method === "GET" || req.method === "HEAD") && pathName === "/media") {

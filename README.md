@@ -2,7 +2,7 @@
 
 A local review studio for creators who work with AI agents. Agents (Grok Bot or any MCP-capable assistant) write scripts, notes, images, audio, and video into a workspace folder and push them to the page you have open. You read, edit, listen, watch, and leave timestamped review notes, all in one dark browser tab.
 
-It is one small Node server (no framework, no build step), one static page, and an MCP stdio server. Agents drive the page through a tiny `control.json` protocol: bump `seq`, list commands, and the page opens the file, jumps to a line, or shows a "Ready for review" banner.
+It is one small Node server (no framework, no build step), one static page, and an MCP stdio server. Agents drive the page through a tiny `control.json` protocol: bump `seq`, list commands, and the page opens the file, jumps to a line, or shows a one-line ready banner.
 
 A `CHANGELOG.md` is maintained with every change.
 
@@ -82,7 +82,7 @@ Nested text backups use the relative path with slashes turned into `__`:
 Projects are ordered by the newest `.md` or `.txt` modification time. A folder with only media sorts last.
 ## Page
 
-The sidebar lists projects, newest first. Toggle chips filter **Video**, **Audio**, **Image**, **Text**, and **Other** (stored in `localStorage` as `studio.fileFilters`). **Unreviewed only** hides files that have a Yes or No verdict (`studio.unreviewedOnly`). A note with no verdict does not count as reviewed, so that file stays in the list. Click the caret to expand a project. Click the project name (or a nested folder name) to open a folder view. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab. Drag a tab to reorder it. Close with ×. A dot on a tab means unsaved text edits. A green ✓ or red ✕ on a file is its review verdict. A note with no verdict shows ✎. Hover a badge for the note.
+The sidebar lists projects, newest first. Toggle chips filter **Video**, **Audio**, **Image**, **Text**, and **Other** (stored in `localStorage` as `studio.fileFilters`). **Unreviewed only** hides files that have a Yes or No verdict (`studio.unreviewedOnly`). A note with no verdict does not count as reviewed, so that file stays in the list. Click the caret to expand a project. Nested folders draw a vertical guide so the tree is easy to scan. The row under the pointer highlights, and the open file or folder keeps an accent bar. Click the project name (or a nested folder name) to open a folder view. Click a file to open a tab. Several tabs stay open. Switch by clicking a tab, or open **▾ N** at the end of the strip and pick a tab from the list. That list is every open tab. Drag a tab in the strip or in that list to reorder it. The new order is written to `studio.openTabs`. Close with ×, middle-click, or **Ctrl+click** (**Cmd+click** on Mac). Right-click a tab for **Close**, **Close others**, **Close to the right**, and **Close all**. Closing still waits for a dirty review note on the active file, the same as ×. The strip stays a single row, scrolls sideways with a thin scrollbar, and keeps the active tab in view. The active tab is filled and underlined. A dot on a tab means unsaved text edits. The tooltip is the path from the workspace (`short/file`). When two open tabs share a file name, the label keeps that name and adds the parent folder in a dim suffix, or the project name when the file sits in the project root. A green ✓ or red ✕ on a file is its review verdict. A note with no verdict shows ✎. Badges are small pills. Hover a badge for the note. Buttons share one shape: filled green for the main action, a quiet text button for Save and Clear, and red when a control removes something. Keyboard focus draws an accent ring.
 
 Text tabs are a textarea with line numbers. **Save** and Ctrl+S write the file. Before every save the server copies the current file into `.studio_backups`. The save sends the hash from when the tab was loaded. If the file changed on disk, the server returns 409 and does not overwrite.
 
@@ -117,11 +117,13 @@ Image tabs (`.png`, `.jpg`, `.jpeg`, `.webp`) fit the picture to the stage. Clic
 
 A folder path opens a folder view of every file sitting directly in that folder (not nested folders). Images are thumbnails (click the picture to open the image tab). Audio files get an inline player. Video files get an inline `<video>` player. `.md` and `.txt` names open a text tab. Other files open a small info view (name, size, modified time). Each item shows its review badge, a note field, and Yes / No buttons. The note is saved when you leave the field, press Enter, or stop typing for a moment. The row shows **Saved** or **Error**. Yes and No toggle, and each click saves the current note. Saving a row does not rebuild the folder, so the field keeps what you typed.
 
-When most files in the folder are audio, the view is a playlist: rows ordered by name, each with the file name, an inline player, a review badge, a note field, and Yes / No. **Play all** plays each audio file top to bottom and advances on `ended`.
+When most files in the folder are audio, the view is a playlist: rows ordered by name, each with the file name, an inline player, a review badge, a note field, and Yes / No. **Play all** plays each audio file top to bottom and advances on `ended`. The folder toolbar always has **Next unreviewed**. It highlights the next row in that folder with no Yes or No verdict and scrolls it into view. It does not start playback. The highlighted row is the one **Y**, **N**, **U**, **J**, and **K** act on.
 
 Unknown types open an info view instead of the editor. `/media` still refuses them.
 
-Every file tab (text, media, or other) has a review bar: **Yes** / **No**, a review note, **Save**, **Clear**, and a status. Yes and No toggle: click the selected one to clear it. **Save** works with a note and no verdict. The note autosaves about 800ms after you type, and again when the field loses focus. Clicking Yes or No saves immediately and sends the current note. The status reads **Unsaved…**, **Saving…**, **Saved** plus the time, or the error in red. Switching tabs or closing the tab waits for that save. Closing the browser warns if a review note is still unsaved or a save is in flight. This review note is separate from `<media file>.review.md` timestamped notes.
+Every file tab (text, media, or other) has a review bar: **Yes** / **No**, a review note, **Next unreviewed**, **Save**, **Clear**, and a status. That includes `.md` and `.txt`. The bar sits above the editor and the markdown preview and does not take over either one. **Ctrl+S** (or **Cmd+S**) still saves the text file. Yes and No toggle: click the selected one to clear it. The selected one is filled green with a check, or red with a cross, and sets `aria-pressed`. **Save** is a quiet text button. It works with a note and no verdict. The note is a one-line field that grows with the text, up to about eight lines, with no resize handle. It autosaves about 800ms after you type, and again when the field loses focus. **Ctrl+Enter** (or **Cmd+Enter**) saves immediately. Clicking Yes or No saves immediately and sends the current note. The status reads **Unsaved**, **Saving…**, **Saved ✓** plus the time, or the error in red. **Next unreviewed** opens the next file in the same folder that has no Yes or No verdict. Switching tabs or closing the tab waits for that save. Closing the browser warns if a review note is still unsaved or a save is in flight. This review note is separate from `<media file>.review.md` timestamped notes.
+
+**Y**, **N**, **U**, **J**, and **K** do not run while the text cursor is in the editor, so those letters type into the file. They work from the markdown preview, from a media or info tab, and whenever focus is not in a field. Switching to Preview blurs the editor so the keys apply to the review again.
 
 On an audio or video tab, the side pane is labelled **Timestamped notes (saved to `<file>.review.md`)**. **Add note @ 0:12** appends a line to that file:
 
@@ -138,6 +140,50 @@ On an image tab the note is optional and has no timestamp. **Add note** appends:
 ```
 
 That review file is the only write from media mode, and it still gets a backup. A gallery tab does not write a review file.
+
+## Keyboard
+
+Shortcuts do nothing while the cursor is in a text field. They also ignore Ctrl, Alt, and Cmd, except the ones that say otherwise. **?** on the tab bar opens the same list.
+
+| Key | Action |
+| --- | --- |
+| **Y** | Yes on the open file, or on the highlighted folder row |
+| **N** | No, in those same places |
+| **U** | Clear the verdict and keep the note |
+| **J** or **↓** | Next file in the current folder. A file tab opens that sibling. A folder view moves the highlight. |
+| **K** or **↑** | Previous file, with the same rules |
+| **Shift+J** or **.** | Next file in the current folder with no Yes or No verdict |
+| **Ctrl+Enter** or **Cmd+Enter** | Save the review note now |
+| **Ctrl+S** or **Cmd+S** | Save the text file |
+| **Ctrl+click** or **Cmd+click** | Close that tab. Same wait for a dirty review as × |
+| Drag a tab | Reorder tabs in the strip or the **▾** list. The order is saved in `studio.openTabs` |
+| **Ctrl+K** or **Ctrl+P** (**Cmd** on Mac) | Quick open |
+| **Esc** | Dismiss the ready banner, or close quick open, the tab menu, the tab list, or shortcut help |
+| **?** or **Shift+/** | Open shortcut help |
+
+## Quick open
+
+**Ctrl+K** or **Ctrl+P** (**Cmd+K** or **Cmd+P** on Mac) opens a centered search box over the page. It lists files from every project. Arrow keys move the highlight, **Enter** opens the highlighted file, **Esc** closes the box, and a click opens that row. Each row shows a kind mark, the path `short/file` with the matched letters highlighted, and the same review badge as the sidebar. The list stops at 50 rows.
+
+Type any words to fuzzy-match that path. The letters have to appear in order. A run of letters next to each other, and a match in the file name, sorts above a scattered match in a folder name. Words are combined: every word has to match.
+
+Filters are single tokens and combine with those words. A repeated filter uses the last value.
+
+| Filter | Matches |
+| --- | --- |
+| `type:audio` | `.wav` and `.mp3` |
+| `type:video` | `.mp4` |
+| `type:image` | `.png`, `.jpg`, `.jpeg`, `.webp` |
+| `type:md` or `type:text` | `.md` and `.txt` |
+| `type:other` | anything else |
+| `ext:wav` | that extension, with or without the dot, any case |
+| `short:demo` | project name contains the text, any case |
+| `reviewed:yes` | verdict Yes |
+| `reviewed:no` | verdict No |
+| `reviewed:none` | no Yes or No verdict. A note with no verdict still matches |
+| `has:note` | a review note, a sibling `<file>.review.md`, or the notes file itself |
+
+Example: `type:audio short:demo line01`.
 
 ## HTTP API
 
@@ -295,7 +341,7 @@ This is how agents drive the page. The page polls this file every 1.5 seconds. I
 | `goto` | `short`, `file`, `line`, `highlight` | Open the text file, scroll to the 1-based line. Highlights the line unless `highlight` is false. A media file or folder is opened normally instead (no text read). |
 | `banner` | `text`, `level`, `timeoutSec` | Toast. `level` is `info`, `warn`, or `ok`. Default timeout is 8 seconds. |
 | `open_review` | `path` (or `short` + `file`), `note` | Open a review tab. `path` is `short/file`, a folder such as `short/art`, or an absolute path inside the root. An image opens an image tab. A folder opens a folder view of every file in that folder. Shows `note` as a normal banner. A `*.wav.review.md` (or mp3/mp4/png/jpg/jpeg/webp) path opens the media file instead. |
-| `notify_ready` | `path` (or `short` + `file`), `kind`, `note` | Open that review tab (file, image, or folder) and show a prominent **Ready for review** banner until dismissed. `kind` is `audio`, `short`, or `image`; it only labels the banner, so a folder with `kind: "audio"` opens the folder view (audio playlist). |
+| `notify_ready` | `path` (or `short` + `file`), `kind`, `note` | Open that review tab (file, image, or folder) and show a one-line ready banner: kind, note, and actions. For a file, **Yes** and **No** save that verdict, keep the current note, and dismiss the banner. The banner also dismisses once that file gains a Yes or No verdict from the review bar, a folder row, or a review that shows up on a later poll. For a folder, the banner shows **Next unreviewed** instead of Yes / No. **Dismiss** is always there. `kind` is `audio`, `short`, or `image`; it only labels the banner, so a folder with `kind: "audio"` opens the folder view (audio playlist). |
 ## MCP
 
 `mcp.js` is a stdio MCP server, so agents can list, read, and edit workspace files and push things to your screen. It uses `@modelcontextprotocol/sdk` and `zod` from the local `node_modules`. Do not print to stdout from this process.
@@ -344,6 +390,7 @@ Shared file rules live in `studio-lib.js`. The HTTP routes live in `server.js`. 
 - Markdown preview: `vendor/marked.umd.js` is served from `server.js` at `/vendor/marked.umd.js`. Preview / Edit / Split live in `index.html`. `.txt` does not use them.
 - New audio, video, or image type: add it to `AUDIO_EXT`, `VIDEO_EXT`, or `IMAGE_EXT`, and to `mimeFor`. In `index.html`, teach `openAnything` and the `*.review.md` pattern the extension. Range streaming already follows `mimeFor`. Unknown extensions are listed as `other` and open the info view.
 - File reviews: `readReviews` / `setReview` / `clearReview` in `studio-lib.js`, `reviews.json` (override with `REVIEWS_PATH`).
+- Tab labels, sibling order, and next-unreviewed: `studio-ui-lib.js`, served at `/studio-ui-lib.js`.
 - Sidebar filters: `studio.fileFilters` and `studio.unreviewedOnly` in `localStorage`.
 - New API route: add a branch in `route()` in `server.js`. Throw `StudioError(status, message)` for a JSON error.
 - New viewer action: handle `cmd.action` in `runCommand` in `index.html`. `control` already passes extra fields through.

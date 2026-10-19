@@ -16,16 +16,35 @@
     --amber: #e6b450;
     --ok: #7fd99a;
     --danger: #f07178;
+    --hover: #262c38;
+    --raised: #1c212b;
+    --radius: 8px;
+    --shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg);
     color: var(--text);
-    font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
+    font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
   }
   button, textarea, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
+  button:focus-visible,
+  .chip:focus-visible,
+  #reviewNote:focus-visible,
+  #noteText:focus-visible,
+  .row-note:focus-visible,
+  #quickInput:focus-visible,
+  #unreviewedRow input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  #editor:focus { outline: none; }
   #app { display: flex; height: 100%; min-height: 0; }
   aside#side {
     width: 300px;
@@ -36,15 +55,15 @@
     border-right: 1px solid var(--line);
     min-height: 0;
   }
-  #brand { padding: 14px 14px 8px; }
-  #brand h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: 0.01em; }
+  #brand { padding: 16px 16px 8px; }
+  #brand h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: 0.01em; }
   #rootLabel {
     margin: 6px 0 0;
     color: var(--muted);
     font-size: 11px;
     word-break: break-all;
   }
-  #shortList { flex: 1; overflow: auto; padding: 4px 8px 12px; }
+  #shortList { flex: 1; overflow: auto; padding: 4px 8px 12px; scrollbar-width: thin; scrollbar-color: #3a4150 transparent; }
   #status { padding: 8px 14px 12px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
   .short { margin-bottom: 4px; }
   .short-head, .file, .group, .folder-head {
@@ -52,11 +71,17 @@
     text-align: left;
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius);
     color: var(--text);
   }
   .short-head { padding: 6px 8px; display: flex; gap: 6px; align-items: baseline; }
-  .short-head:hover, .file:hover, .folder-head:hover { background: #232833; }
+  .short-head:hover, .file:hover, .folder-head:hover { background: var(--hover); }
+  .short > .folder-head, .short > .file { margin-left: 8px; }
+  .tree-branch {
+    margin: 1px 0 2px 14px;
+    padding: 0 0 0 6px;
+    border-left: 1px solid #3a4254;
+  }
   .short-head .caret, .folder-head .caret { color: var(--muted); width: 10px; flex: none; }
   .short-head .mtime { margin-left: auto; color: var(--muted); font-size: 11px; }
   .group {
@@ -68,29 +93,38 @@
     cursor: default;
   }
   .file {
-    padding: 4px 8px 4px 24px;
+    padding: 3px 8px;
     color: #d5dbe6;
     font-size: 13px;
     display: flex;
     align-items: center;
     gap: 6px;
   }
-  .file.open, .folder-head.open { background: #24312f; color: var(--accent); }
+  .file.open, .folder-head.open, .short-head.open {
+    background: #1e3330;
+    color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
   .file .names { flex: 1; min-width: 0; }
   .file .path { display: block; color: var(--muted); font-size: 11px; }
-  .folder-head { padding: 4px 8px 4px 24px; display: flex; gap: 6px; align-items: baseline; }
+  .folder-head { padding: 3px 8px; display: flex; gap: 6px; align-items: baseline; }
   .folder-head .label { flex: 1; min-width: 0; }
   .rev-badge {
     flex: none;
-    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #12141a;
     text-align: center;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
-    line-height: 1;
+    line-height: 14px;
   }
-  .rev-badge.yes { color: var(--ok); }
-  .rev-badge.no { color: var(--danger); }
-  .rev-badge.note { color: var(--amber); width: auto; min-width: 16px; }
+  .rev-badge.yes { color: var(--ok); border-color: #2d6a45; background: #15291c; }
+  .rev-badge.no { color: var(--danger); border-color: #7a3a40; background: #2a171a; }
+  .rev-badge.note { color: var(--amber); border-color: #6d5a2e; background: #2a2416; }
   #filters {
     display: flex;
     flex-wrap: wrap;
@@ -105,6 +139,7 @@
     font-size: 11px;
     color: var(--muted);
   }
+  .chip:hover { color: var(--text); }
   .chip.on {
     background: #1c3330;
     border-color: #3d7a6a;
@@ -131,23 +166,49 @@
   #tabbar {
     display: flex;
     align-items: stretch;
+    flex: none;
     border-bottom: 1px solid var(--line);
     background: #14171e;
     min-height: 42px;
+    min-width: 0;
   }
-  #tabs { display: flex; gap: 4px; overflow-x: auto; flex: 1; padding: 6px; }
+  #tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    min-width: 0;
+    padding: 6px;
+    scrollbar-width: thin;
+  }
+  #tabs::-webkit-scrollbar { height: 6px; }
+  #tabs::-webkit-scrollbar-thumb { background: #3a4150; border-radius: 4px; }
   .tab {
     display: flex;
     align-items: center;
     gap: 4px;
+    flex: none;
+    max-width: 280px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 8px;
+    border-radius: var(--radius);
+    padding: 5px 8px 5px 10px;
     color: var(--muted);
     white-space: nowrap;
+    user-select: none;
   }
-  .tab.active { background: #222733; color: var(--text); border-color: var(--line); }
+  .tab:hover { background: #1e232e; color: var(--text); }
+  .tab.active {
+    background: #222833;
+    color: var(--text);
+    border-color: #3a4254;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .tab.drop-target, .menu button.drop-target { box-shadow: inset 3px 0 0 var(--accent); }
+  .tab .name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tab .suffix { flex: none; color: var(--muted); font-size: 11px; }
   .tab.dirty .name::before {
     content: "";
     display: inline-block;
@@ -157,18 +218,106 @@
     border-radius: 50%;
     background: var(--amber);
   }
-  .tab .x { opacity: 0.55; padding: 0 2px; }
-  .tab .x:hover { opacity: 1; color: var(--danger); }
-  .tab.dragging { opacity: 0.45; }
-  #saveBtn {
+  .tab .x {
+    opacity: 0.45;
+    padding: 0 4px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .tab:hover .x, .tab.active .x { opacity: 0.85; }
+  .tab .x:hover { opacity: 1; color: var(--danger); background: #3a2226; }
+  .tab.dragging, .menu button.dragging { opacity: 0.45; }
+  #tabOverflowWrap {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+  }
+  #tabOverflow, #helpBtn {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin: 6px 4px;
+    padding: 2px 8px;
+    color: var(--muted);
+    flex: none;
+  }
+  #tabOverflow:hover, #helpBtn:hover { color: var(--text); background: var(--hover); }
+  .menu {
+    z-index: 40;
+    min-width: 180px;
+    max-height: 280px;
+    overflow: auto;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+  }
+  #tabMenu { position: fixed; }
+  #tabList { position: absolute; right: 0; top: 100%; }
+  .menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    padding: 6px 8px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .menu button:hover, .menu button.active { background: var(--hover); }
+  .menu button.active { color: var(--accent); }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .help-card {
+    width: min(520px, calc(100% - 32px));
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .help-card h2 { margin: 0 0 8px; font-size: 16px; }
+  .help-card p { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .help-card ul { margin: 0; padding: 0; list-style: none; }
+  .help-card li { display: flex; gap: 10px; padding: 3px 0; }
+  .help-card kbd {
+    font: 12px/1.4 Consolas, "Cascadia Mono", monospace;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 4px;
+    background: #12141a;
+  }
+  .help-card .keys { flex: none; width: 196px; color: var(--text); }
+  #helpClose {
+    margin-top: 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    color: var(--muted);
+  }
+  #helpClose:hover { color: var(--text); background: var(--hover); }
+  #saveBtn, #playAllBtn {
     margin: 6px;
     background: #1c3330;
     border: 1px solid #3d7a6a;
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 4px 12px;
+    color: var(--text);
   }
+  #saveBtn:hover:not(:disabled), #playAllBtn:hover { background: #245049; }
   #saveBtn:disabled { opacity: 0.4; cursor: default; }
-  .conflict, .ready { margin: 8px 12px 0; border-radius: 8px; }
+  .conflict, .ready { margin: 8px 12px 0; border-radius: var(--radius); flex: none; }
   .conflict {
     display: flex;
     gap: 8px;
@@ -181,22 +330,39 @@
   .conflict button, .ready button, #addNote {
     background: #262b36;
     border: 1px solid #3a4150;
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 4px 8px;
   }
+  .conflict button:hover, .ready button:hover, #addNote:hover { background: #323846; }
   .ready {
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
     align-items: center;
-    padding: 14px 16px;
+    gap: 8px;
+    padding: 4px 8px;
     background: #1c2e22;
     border: 1px solid var(--ok);
-    box-shadow: 0 0 0 3px rgba(127, 217, 154, 0.16);
+    min-height: 0;
   }
-  .ready strong { display: block; font-size: 18px; }
-  .ready .kind { color: var(--ok); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-  .ready p { margin: 4px 0 0; }
+  .ready .kind {
+    flex: none;
+    color: var(--ok);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--ok);
+    border-radius: 999px;
+    padding: 1px 6px;
+  }
+  #readyNote {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #readyActions { display: flex; gap: 6px; flex: none; align-items: center; }
+  #readyYes { background: #1c3330; border-color: var(--ok); color: var(--ok); }
+  #readyNo { background: #3a2226; border-color: var(--danger); color: var(--danger); }
   .conflict[hidden], .ready[hidden], .pane[hidden], [hidden] { display: none !important; }
   .pane { flex: 1; min-height: 0; }
   #empty { display: grid; place-items: center; color: var(--muted); }
@@ -405,12 +571,7 @@
     align-items: center;
     margin-bottom: 10px;
   }
-  #playAllBtn {
-    background: #1c3330;
-    border: 1px solid #3d7a6a;
-    border-radius: 6px;
-    padding: 4px 12px;
-  }
+  #playAllBtn { margin: 0; }
   #galleryGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -518,43 +679,75 @@
   .quick-rev button {
     background: #262b36;
     border: 1px solid #3a4150;
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 2px 8px;
     font-size: 12px;
   }
-  .quick-rev button.on.yes, #reviewYes.on { background: #1c3330; border-color: var(--ok); color: var(--ok); }
-  .quick-rev button.on.no, #reviewNo.on { background: #3a2226; border-color: var(--danger); color: var(--danger); }
+  .quick-rev button:hover { background: #323846; }
+  .quick-rev button.on.yes { background: #1c3330; border-color: var(--ok); color: var(--ok); }
+  .quick-rev button.on.no { background: #3a2226; border-color: var(--danger); color: var(--danger); }
+  #galleryGrid .is-current {
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
   #reviewBar {
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: flex-start;
     flex-wrap: wrap;
-    padding: 6px 12px;
+    flex: none;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--line);
     background: #14171e;
   }
-  #reviewBar .review-label { color: var(--muted); font-size: 12px; }
-  #reviewYes, #reviewNo, #reviewSave, #reviewClear, #playAllBtn {
+  #reviewBar .review-label { color: var(--muted); font-size: 12px; align-self: center; }
+  #reviewYes, #reviewNo, #reviewNext, #nextUnreviewedBtn, #readyNext {
     background: #262b36;
     border: 1px solid #3a4150;
-    border-radius: 6px;
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    align-self: center;
+  }
+  #reviewNext:hover, #nextUnreviewedBtn:hover, #readyNext:hover { background: #323846; }
+  #reviewYes[aria-pressed="true"] {
+    background: var(--ok);
+    border-color: var(--ok);
+    color: #102216;
+    font-weight: 700;
+  }
+  #reviewNo[aria-pressed="true"] {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #2a0d10;
+    font-weight: 700;
+  }
+  #reviewSave, #reviewClear {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
     padding: 4px 8px;
+    color: var(--muted);
+    align-self: center;
   }
-  #playAllBtn {
-    background: #1c3330;
-    border-color: #3d7a6a;
-  }
+  #reviewSave:hover, #reviewClear:hover { color: var(--text); background: var(--hover); }
+  #reviewClear:hover { color: var(--danger); }
   #reviewNote {
     flex: 1;
     min-width: 140px;
     height: 32px;
+    min-height: 32px;
+    max-height: 172px;
+    line-height: 20px;
     resize: none;
+    overflow: hidden;
+    scrollbar-width: none;
     background: #101218;
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 6px 8px;
   }
-  #reviewWhen, #reviewStatus { font-size: 12px; }
+  #reviewNote::-webkit-scrollbar { width: 0; height: 0; }
+  #reviewWhen, #reviewStatus { font-size: 12px; align-self: center; white-space: nowrap; }
   #reviewStatus.error { color: var(--danger); }
   #reviewStatus.unsaved { color: var(--amber); }
   #infoPane { overflow: auto; padding: 24px 28px; }
@@ -609,15 +802,90 @@
   .toast {
     pointer-events: auto;
     padding: 8px 12px;
-    border-radius: 8px;
+    border-radius: var(--radius);
     background: #243044;
     border: 1px solid #3d5278;
     max-width: 380px;
+    box-shadow: var(--shadow);
   }
   .toast.warn { background: #3a2e16; border-color: var(--amber); }
   .toast.ok { background: #1a3324; border-color: var(--ok); }
   .muted { color: var(--muted); }
   .warn-text { color: var(--amber); }
+  .quick-overlay {
+    align-items: start;
+    padding-top: 14vh;
+    background: rgba(8, 10, 14, 0.62);
+  }
+  .quick-card {
+    width: min(640px, calc(100% - 32px));
+    background: var(--raised);
+    border: 1px solid #3a4254;
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+  #quickInput {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    padding: 14px 16px;
+    font-size: 16px;
+    border-radius: 0;
+  }
+  #quickList {
+    max-height: 320px;
+    overflow: auto;
+    padding: 4px;
+    scrollbar-width: thin;
+  }
+  .quick-empty { margin: 8px 12px; }
+  .quick-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    color: var(--text);
+  }
+  .quick-row:hover, .quick-row[aria-selected="true"] { background: var(--hover); }
+  .quick-row[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--accent); }
+  .quick-kind {
+    flex: none;
+    width: 18px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .quick-kind.audio, .quick-kind.text { color: var(--accent); }
+  .quick-kind.image { color: var(--amber); }
+  .quick-kind.video { color: var(--ok); }
+  .quick-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  .quick-path mark {
+    background: transparent;
+    color: var(--accent);
+    font-weight: 700;
+    padding: 0;
+  }
+  #quickHint {
+    margin: 0;
+    padding: 8px 14px 10px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
@@ -643,6 +911,11 @@
   <main>
     <div id="tabbar">
       <div id="tabs"></div>
+      <div id="tabOverflowWrap" hidden>
+        <button id="tabOverflow" type="button" aria-haspopup="listbox" aria-expanded="false">▾ 0</button>
+        <div id="tabList" class="menu" hidden role="listbox"></div>
+      </div>
+      <button id="helpBtn" type="button" title="Keyboard shortcuts">?</button>
       <div id="mdModes" hidden role="group" aria-label="Markdown view">
         <button type="button" data-mode="preview">Preview</button>
         <button type="button" data-mode="edit">Edit</button>
@@ -651,12 +924,14 @@
       <button id="saveBtn" type="button" hidden>Save</button>
     </div>
     <div id="ready" class="ready" hidden>
-      <div>
-        <span class="kind" id="readyKind"></span>
-        <strong>Ready for review</strong>
-        <p id="readyNote"></p>
-      </div>
-      <button id="readyDismiss" type="button">Dismiss</button>
+      <span class="kind" id="readyKind"></span>
+      <span id="readyNote"></span>
+      <span id="readyActions">
+        <button id="readyYes" type="button" hidden>Yes</button>
+        <button id="readyNo" type="button" hidden>No</button>
+        <button id="readyNext" type="button" hidden>Next unreviewed</button>
+        <button id="readyDismiss" type="button">Dismiss</button>
+      </span>
     </div>
     <div id="conflict" class="conflict" hidden>
       <span>This file changed on disk and you have unsaved edits.</span>
@@ -665,9 +940,10 @@
     </div>
     <div id="reviewBar" hidden>
       <span class="review-label">Review</span>
-      <button type="button" id="reviewYes">Yes</button>
-      <button type="button" id="reviewNo">No</button>
+      <button type="button" id="reviewYes" aria-pressed="false">Yes</button>
+      <button type="button" id="reviewNo" aria-pressed="false">No</button>
       <textarea id="reviewNote" rows="1" placeholder="Note" aria-label="Review note"></textarea>
+      <button type="button" id="reviewNext">Next unreviewed</button>
       <button type="button" id="reviewSave">Save</button>
       <button type="button" id="reviewClear">Clear</button>
       <span id="reviewStatus"></span>
@@ -715,6 +991,7 @@
     <section id="galleryPane" class="pane" hidden>
       <div id="galleryToolbar" hidden>
         <button type="button" id="playAllBtn">Play all</button>
+        <button type="button" id="nextUnreviewedBtn">Next unreviewed</button>
         <span id="playAllStatus" class="muted"></span>
       </div>
       <div id="galleryGrid"></div>
@@ -722,9 +999,47 @@
     <div id="toasts"></div>
   </main>
 </div>
+<div id="tabMenu" class="menu" hidden role="menu">
+  <button type="button" data-act="close">Close</button>
+  <button type="button" data-act="others">Close others</button>
+  <button type="button" data-act="right">Close to the right</button>
+  <button type="button" data-act="all">Close all</button>
+</div>
+<div id="quickOpen" class="overlay quick-overlay" hidden>
+  <div class="quick-card" role="dialog" aria-modal="true" aria-label="Quick open">
+    <input id="quickInput" type="text" placeholder="Search files" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="quickList" aria-label="Quick open">
+    <div id="quickList" role="listbox" aria-label="Files"></div>
+    <p id="quickHint">↑↓ select · Enter opens · Esc closes · type: audio video image md text other · ext: · short: · reviewed: yes no none · has:note</p>
+  </div>
+</div>
+<div id="help" class="overlay" hidden>
+  <div class="help-card" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <h2>Keyboard shortcuts</h2>
+    <p>Ignored while typing in a field, including the text editor. Ctrl, Alt, and Cmd are ignored except where a shortcut uses them. Quick open filters: <kbd>type:</kbd> audio, video, image, md, text, or other; <kbd>ext:</kbd>wav; <kbd>short:</kbd>name; <kbd>reviewed:</kbd> yes, no, or none; <kbd>has:note</kbd>.</p>
+    <ul>
+      <li><span class="keys"><kbd>Y</kbd></span><span>Yes</span></li>
+      <li><span class="keys"><kbd>N</kbd></span><span>No</span></li>
+      <li><span class="keys"><kbd>U</kbd></span><span>Clear the verdict and keep the note</span></li>
+      <li><span class="keys"><kbd>J</kbd> <kbd>↓</kbd></span><span>Next file in this folder</span></li>
+      <li><span class="keys"><kbd>K</kbd> <kbd>↑</kbd></span><span>Previous file in this folder</span></li>
+      <li><span class="keys"><kbd>Shift</kbd>+<kbd>J</kbd> <kbd>.</kbd></span><span>Next file with no verdict</span></li>
+      <li><span class="keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><span>Save the review note</span></li>
+      <li><span class="keys"><kbd>Ctrl</kbd>+<kbd>S</kbd></span><span>Save the text file</span></li>
+      <li><span class="keys"><kbd>Ctrl</kbd>+click</span><span>Close the tab (Cmd+click on Mac). Same save wait as ×</span></li>
+      <li><span class="keys">Drag</span><span>Reorder tabs in the strip or the ▾ list</span></li>
+      <li><span class="keys"><kbd>Ctrl</kbd>+<kbd>K</kbd> <kbd>Ctrl</kbd>+<kbd>P</kbd></span><span>Quick open. Cmd on Mac</span></li>
+      <li><span class="keys"><kbd>Esc</kbd></span><span>Dismiss the banner, quick open, or a menu</span></li>
+      <li><span class="keys"><kbd>?</kbd></span><span>Show this help</span></li>
+    </ul>
+    <button id="helpClose" type="button">Close</button>
+  </div>
+</div>
 <script src="/vendor/marked.umd.js"></script>
+<script src="/studio-ui-lib.js"></script>
 <script>
 (function () {
+  const Ui = window.StudioUi;
+  if (!Ui) throw new Error("studio-ui-lib.js failed to load");
   const POLL_MS = 1500;
   const REVIEW_AUTOSAVE_MS = 800;
   const els = {
@@ -732,11 +1047,24 @@
     shortList: document.getElementById("shortList"),
     status: document.getElementById("status"),
     tabs: document.getElementById("tabs"),
+    tabOverflowWrap: document.getElementById("tabOverflowWrap"),
+    tabOverflow: document.getElementById("tabOverflow"),
+    tabList: document.getElementById("tabList"),
+    tabMenu: document.getElementById("tabMenu"),
+    helpBtn: document.getElementById("helpBtn"),
+    help: document.getElementById("help"),
+    helpClose: document.getElementById("helpClose"),
+    quickOpen: document.getElementById("quickOpen"),
+    quickInput: document.getElementById("quickInput"),
+    quickList: document.getElementById("quickList"),
     mdModes: document.getElementById("mdModes"),
     saveBtn: document.getElementById("saveBtn"),
     ready: document.getElementById("ready"),
     readyKind: document.getElementById("readyKind"),
     readyNote: document.getElementById("readyNote"),
+    readyYes: document.getElementById("readyYes"),
+    readyNo: document.getElementById("readyNo"),
+    readyNext: document.getElementById("readyNext"),
     readyDismiss: document.getElementById("readyDismiss"),
     conflict: document.getElementById("conflict"),
     reloadDisk: document.getElementById("reloadDisk"),
@@ -763,6 +1091,7 @@
     galleryGrid: document.getElementById("galleryGrid"),
     playAllBtn: document.getElementById("playAllBtn"),
     playAllStatus: document.getElementById("playAllStatus"),
+    nextUnreviewedBtn: document.getElementById("nextUnreviewedBtn"),
     infoPane: document.getElementById("infoPane"),
     infoName: document.getElementById("infoName"),
     infoPath: document.getElementById("infoPath"),
@@ -776,6 +1105,7 @@
     reviewNote: document.getElementById("reviewNote"),
     reviewSave: document.getElementById("reviewSave"),
     reviewClear: document.getElementById("reviewClear"),
+    reviewNext: document.getElementById("reviewNext"),
     reviewStatus: document.getElementById("reviewStatus"),
     reviewWhen: document.getElementById("reviewWhen"),
     notesHeading: document.getElementById("notesHeading"),
@@ -805,7 +1135,12 @@
     reviewSaving: false,
     reviewSaveTimer: null,
     galleryStale: false,
+    galleryFocus: null,
+    readyTarget: null,
+    tabMenuTab: null,
     playAll: null,
+    quickIndex: 0,
+    quickHits: [],
   };
 
   const OPEN_TABS_KEY = "studio.openTabs";
@@ -838,11 +1173,35 @@
     setTimeout(() => el.remove(), ms);
   }
 
-  function showReady(kind, note) {
+  function showReady(kind, note, loc) {
     const labels = { audio: "Audio", short: "Short", image: "Image" };
+    const folder = Boolean(loc && loc.kind === "gallery");
+    state.readyTarget = loc && typeof loc.short === "string"
+      ? { short: loc.short, file: loc.file || "", folder: folder }
+      : null;
     els.readyKind.textContent = labels[kind] || "";
     els.readyNote.textContent = note || "";
+    els.readyNote.title = note || "";
+    const fileTarget = Boolean(state.readyTarget && !state.readyTarget.folder && state.readyTarget.file);
+    state.readySeenVerdict = fileTarget ? reviewVerdict(reviewOf(state.readyTarget.short, state.readyTarget.file)) : null;
+    els.readyYes.hidden = !fileTarget;
+    els.readyNo.hidden = !fileTarget;
+    els.readyNext.hidden = !(state.readyTarget && state.readyTarget.folder);
     els.ready.hidden = false;
+  }
+
+  function dismissReady() {
+    els.ready.hidden = true;
+    state.readyTarget = null;
+    state.readySeenVerdict = null;
+  }
+
+  function maybeDismissReady() {
+    const target = state.readyTarget;
+    if (!target || target.folder || els.ready.hidden) return;
+    const verdict = reviewVerdict(reviewOf(target.short, target.file));
+    if (!verdict || verdict === state.readySeenVerdict) return;
+    dismissReady();
   }
 
   async function api(url, opts) {
@@ -1184,6 +1543,7 @@
     }
     els.editorCol.hidden = mode === "preview";
     els.mdPreview.hidden = !md || mode === "edit";
+    if (mode === "preview" && document.activeElement === els.editor) els.editor.blur();
   }
 
   function setMdView(mode) {
@@ -1318,7 +1678,6 @@
       const head = document.createElement("button");
       head.type = "button";
       head.className = "folder-head";
-      head.style.paddingLeft = 24 + depth * 12 + "px";
       const galOpen = state.tabs.some((tab) => tab.kind === "gallery" && tab.short === short && tab.file === childRel);
       if (galOpen) head.classList.add("open");
       const caret = document.createElement("span");
@@ -1339,14 +1698,18 @@
         openGallery(short, childRel).catch((err) => showBanner(err.message, "warn", 5));
       };
       wrap.append(head);
-      if (expanded) renderDirNode(wrap, short, child, childRel, depth + 1);
+      if (expanded) {
+        const branch = document.createElement("div");
+        branch.className = "tree-branch";
+        renderDirNode(branch, short, child, childRel, depth + 1);
+        wrap.append(branch);
+      }
     }
     const files = node.files.slice().sort((a, b) => a.name.localeCompare(b.name));
     for (const item of files) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "file";
-      btn.style.paddingLeft = 24 + depth * 12 + "px";
       const open = state.tabs.some((tab) => tab.short === short && tab.file === item.name && tab.kind !== "gallery");
       if (open) btn.classList.add("open");
       btn.title = formatWhen(item.mtime);
@@ -1362,18 +1725,118 @@
     }
   }
 
+  function scrollActiveTab() {
+    const activeEl = els.tabs.querySelector(".tab.active");
+    if (!activeEl) return;
+    const left = activeEl.offsetLeft;
+    const right = left + activeEl.offsetWidth;
+    if (left < els.tabs.scrollLeft) els.tabs.scrollLeft = left;
+    else if (right > els.tabs.scrollLeft + els.tabs.clientWidth) {
+      els.tabs.scrollLeft = right - els.tabs.clientWidth;
+    }
+  }
+
+  function clearDropTargets() {
+    for (const el of document.querySelectorAll(".drop-target")) el.classList.remove("drop-target");
+  }
+
+  function tabChord(event) {
+    return Boolean(event.ctrlKey || event.metaKey);
+  }
+
+  function bindTabDrag(el, tab) {
+    el.draggable = true;
+    el.addEventListener("dragstart", (event) => {
+      if (event.target.closest && event.target.closest(".x")) {
+        event.preventDefault();
+        return;
+      }
+      dragTab = tab;
+      el.classList.add("dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        try { event.dataTransfer.setData("text/plain", "tab"); } catch { /* synthetic drags */ }
+      }
+    });
+    el.addEventListener("dragend", () => {
+      dragTab = null;
+      el.classList.remove("dragging");
+      clearDropTargets();
+    });
+    el.addEventListener("dragover", (event) => {
+      if (!dragTab || dragTab === tab) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      clearDropTargets();
+      el.classList.add("drop-target");
+    });
+    el.addEventListener("dragleave", () => {
+      el.classList.remove("drop-target");
+    });
+    el.addEventListener("drop", (event) => {
+      event.preventDefault();
+      clearDropTargets();
+      const from = state.tabs.indexOf(dragTab);
+      const to = state.tabs.indexOf(tab);
+      dragTab = null;
+      reorderTab(from, to);
+    });
+  }
+
+  function wireTabClick(el, tab, overflow) {
+    el.addEventListener("mousedown", (event) => {
+      if (event.button === 1) event.preventDefault();
+      if (event.button === 0 && tabChord(event)) event.preventDefault();
+    });
+    el.addEventListener("mouseup", (event) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      if (overflow) hideTabList();
+      closeTab(tab);
+    });
+    el.addEventListener("auxclick", (event) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      if (overflow) hideTabList();
+      closeTab(tab);
+    });
+    el.addEventListener("click", (event) => {
+      if (event.button !== 0) return;
+      if (tabChord(event)) {
+        event.preventDefault();
+        if (overflow) hideTabList();
+        closeTab(tab);
+        return;
+      }
+      if (overflow) hideTabList();
+      activate(tab);
+    });
+    el.addEventListener("contextmenu", (event) => {
+      if (tabChord(event)) {
+        event.preventDefault();
+        if (overflow) hideTabList();
+        closeTab(tab);
+        return;
+      }
+      if (overflow) return;
+      event.preventDefault();
+      openTabMenu(tab, event.clientX, event.clientY);
+    });
+    bindTabDrag(el, tab);
+  }
+
   function renderTabs() {
+    const labels = Ui.tabLabels(state.tabs);
     els.tabs.replaceChildren();
-    for (const tab of state.tabs) {
+    state.tabs.forEach((tab, index) => {
+      const info = labels[index];
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "tab" + (tab === state.active ? " active" : "") + (tab.dirty ? " dirty" : "");
-      btn.title = tab.short + "/" + tab.file;
+      btn.title = info.title;
       const label = document.createElement("span");
       label.className = "name";
-      label.textContent = tab.kind === "gallery"
-        ? (tab.file ? tab.file.split("/").pop() : tab.short)
-        : tab.file.split("/").pop();
+      label.textContent = info.name;
       const x = document.createElement("span");
       x.className = "x";
       x.textContent = "×";
@@ -1382,41 +1845,79 @@
         event.stopPropagation();
         closeTab(tab);
       };
-      btn.draggable = true;
-      btn.addEventListener("dragstart", (event) => {
-        if (event.target.closest(".x")) {
-          event.preventDefault();
-          return;
-        }
-        dragTab = tab;
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", "tab");
-        btn.classList.add("dragging");
-      });
-      btn.addEventListener("dragend", () => {
-        dragTab = null;
-        btn.classList.remove("dragging");
-      });
-      btn.addEventListener("dragover", (event) => {
-        if (!dragTab || dragTab === tab) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-      });
-      btn.addEventListener("drop", (event) => {
-        event.preventDefault();
-        const from = state.tabs.indexOf(dragTab);
-        dragTab = null;
-        reorderTab(from, state.tabs.indexOf(tab));
-      });
-      btn.append(label, x);
-      btn.onclick = () => activate(tab);
+      btn.append(label);
+      if (info.suffix) {
+        const suffix = document.createElement("span");
+        suffix.className = "suffix";
+        suffix.textContent = info.suffix;
+        btn.append(suffix);
+      }
+      btn.append(x);
+      wireTabClick(btn, tab, false);
       els.tabs.append(btn);
-    }
+    });
+    const count = state.tabs.length;
+    els.tabOverflowWrap.hidden = count === 0;
+    els.tabOverflow.textContent = "▾ " + count;
+    scrollActiveTab();
     const text = state.active && state.active.kind === "text";
     els.saveBtn.hidden = !text;
     els.saveBtn.disabled = !text || !state.active.dirty || state.active.saving;
     els.saveBtn.textContent = state.active && state.active.saving ? "Saving…" : "Save";
     syncMdChrome();
+  }
+
+  function hideTabMenu() {
+    els.tabMenu.hidden = true;
+    state.tabMenuTab = null;
+  }
+
+  function openTabMenu(tab, x, y) {
+    hideTabList();
+    state.tabMenuTab = tab;
+    els.tabMenu.hidden = false;
+    els.tabMenu.style.left = Math.max(8, x) + "px";
+    els.tabMenu.style.top = Math.max(8, y) + "px";
+    requestAnimationFrame(() => {
+      const rect = els.tabMenu.getBoundingClientRect();
+      const dx = Math.max(0, rect.right - window.innerWidth + 8);
+      const dy = Math.max(0, rect.bottom - window.innerHeight + 8);
+      if (dx) els.tabMenu.style.left = Math.max(8, x - dx) + "px";
+      if (dy) els.tabMenu.style.top = Math.max(8, y - dy) + "px";
+    });
+  }
+
+  function hideTabList() {
+    els.tabList.hidden = true;
+    els.tabOverflow.setAttribute("aria-expanded", "false");
+  }
+
+  function openTabList() {
+    hideTabMenu();
+    const labels = Ui.tabLabels(state.tabs);
+    els.tabList.replaceChildren();
+    state.tabs.forEach((tab, index) => {
+      const info = labels[index];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", tab === state.active ? "true" : "false");
+      btn.title = info.title;
+      btn.textContent = info.suffix ? info.name + "  " + info.suffix : info.name;
+      if (tab === state.active) btn.classList.add("active");
+      wireTabClick(btn, tab, true);
+      els.tabList.append(btn);
+    });
+    els.tabList.hidden = false;
+    els.tabOverflow.setAttribute("aria-expanded", "true");
+  }
+
+  function showHelp() {
+    els.help.hidden = false;
+  }
+
+  function hideHelp() {
+    els.help.hidden = true;
   }
 
   function updateConflict() {
@@ -1482,11 +1983,13 @@
     renderTabs();
     updateConflict();
     if (!tab) {
+      if (document.activeElement === els.editor) els.editor.blur();
       showPane("empty");
       syncReviewBar();
       persistTabs();
       return;
     }
+    if (tab.kind !== "text" && document.activeElement === els.editor) els.editor.blur();
     if (tab.kind === "text") {
       showPane("text");
       els.editor.value = tab.content;
@@ -1557,16 +2060,19 @@
   }
 
   async function closeTabBody(tab) {
+    if (!state.tabs.includes(tab)) return;
     if (state.active === tab && fileTabActive()) {
       const ok = await flushReviewDraft();
       if (!ok && state.reviewDraftDirty) return;
     }
+    if (!state.tabs.includes(tab)) return;
     if (state.active === tab) {
       pauseMedia();
       state.active = null;
     }
     const index = state.tabs.indexOf(tab);
-    if (index >= 0) state.tabs.splice(index, 1);
+    if (index < 0) return;
+    state.tabs.splice(index, 1);
     if (!state.active && state.tabs.length) {
       await activateBody(state.tabs[Math.max(0, index - 1)]);
     } else if (!state.tabs.length) {
@@ -1587,6 +2093,54 @@
       const found = state.tabs.filter((tab) => tab.short === short && tab.file === file);
       for (const tab of found) await closeTabBody(tab);
     });
+  }
+
+  function closeTabsWhere(shouldClose, prefer) {
+    return enqueueUi(() => closeTabsWhereBody(shouldClose, prefer));
+  }
+
+  async function closeTabsWhereBody(shouldClose, prefer) {
+    const closing = state.tabs.filter(shouldClose);
+    if (!closing.length) return;
+    const closingActive = Boolean(state.active && closing.includes(state.active));
+    if (closingActive && fileTabActive()) {
+      const ok = await flushReviewDraft();
+      if (!ok && state.reviewDraftDirty) return;
+    }
+    if (closingActive) {
+      pauseMedia();
+      state.active = null;
+    }
+    state.tabs = state.tabs.filter((tab) => !closing.includes(tab));
+    if (!closingActive) {
+      renderTabs();
+      renderSidebar();
+      persistTabs();
+      return;
+    }
+    const next = prefer && state.tabs.includes(prefer) ? prefer : state.tabs[state.tabs.length - 1] || null;
+    if (next) {
+      await activateBody(next);
+      renderSidebar();
+      return;
+    }
+    showPane("empty");
+    renderTabs();
+    updateConflict();
+    syncReviewBar();
+    renderSidebar();
+    persistTabs();
+  }
+
+  function closeOtherTabs(keep) {
+    return closeTabsWhere((tab) => tab !== keep, keep);
+  }
+
+  function closeTabsToTheRight(tab) {
+    const index = state.tabs.indexOf(tab);
+    if (index < 0) return Promise.resolve();
+    const keep = state.tabs.slice(0, index + 1);
+    return closeTabsWhere((item) => !keep.includes(item), tab);
   }
 
   function closeAll() {
@@ -2071,6 +2625,39 @@
     return wrap;
   }
 
+  function decorateGalleryRow(row, name) {
+    row.dataset.revFile = name;
+    if (name === state.galleryFocus) row.classList.add("is-current");
+    row.addEventListener("mousedown", () => {
+      state.galleryFocus = name;
+      highlightGalleryFocus(false);
+    });
+  }
+
+  function highlightGalleryFocus(scroll) {
+    const rows = els.galleryGrid.querySelectorAll("[data-rev-file]");
+    let found = null;
+    for (const row of rows) {
+      const on = row.dataset.revFile === state.galleryFocus;
+      row.classList.toggle("is-current", on);
+      if (on) found = row;
+    }
+    if (!found || !scroll) return;
+    if (!found.hasAttribute("tabindex")) found.tabIndex = -1;
+    found.scrollIntoView({ block: "nearest", inline: "nearest" });
+    found.focus({ preventScroll: true });
+  }
+
+  function currentGalleryRow() {
+    const name = state.galleryFocus;
+    if (!name) return null;
+    const rows = els.galleryGrid.querySelectorAll("[data-rev-file]");
+    for (const row of rows) {
+      if (row.dataset.revFile === name) return row;
+    }
+    return null;
+  }
+
   function renderGallery(tab) {
     stopPlayAll();
     els.galleryGrid.replaceChildren();
@@ -2078,17 +2665,20 @@
     tab.files = files;
     tab.images = files.filter((item) => item.kind === "image");
     const audioHeavy = isAudioHeavy(files);
-    els.galleryToolbar.hidden = !audioHeavy;
+    els.playAllBtn.hidden = !audioHeavy;
+    els.galleryToolbar.hidden = !files.length;
     els.galleryGrid.classList.toggle("playlist", audioHeavy);
     els.galleryGrid.classList.toggle("list", !audioHeavy && files.some((item) => item.kind !== "image"));
     if (!audioHeavy && !files.some((item) => item.kind !== "image")) els.galleryGrid.classList.remove("list");
     if (!files.length) {
+      state.galleryFocus = null;
       const p = document.createElement("p");
       p.className = "muted";
       p.textContent = "No files in this folder.";
       els.galleryGrid.append(p);
       return;
     }
+    if (!files.some((item) => item.name === state.galleryFocus)) state.galleryFocus = files[0].name;
     if (audioHeavy) {
       for (const item of files) els.galleryGrid.append(renderPlaylistRow(tab, item));
       return;
@@ -2102,7 +2692,7 @@
   function renderImageThumb(tab, item) {
     const card = document.createElement("div");
     card.className = "thumb";
-    card.dataset.revFile = item.name;
+    decorateGalleryRow(card, item.name);
     const open = document.createElement("button");
     open.type = "button";
     open.className = "thumb-open";
@@ -2125,7 +2715,7 @@
   function renderFolderItem(tab, item) {
     const row = document.createElement("div");
     row.className = "folder-item";
-    row.dataset.revFile = item.name;
+    decorateGalleryRow(row, item.name);
     const head = document.createElement("div");
     head.className = "folder-item-head";
     const name = document.createElement("button");
@@ -2161,7 +2751,7 @@
     name.className = "name";
     name.textContent = item.name.split("/").pop();
     name.onclick = () => openListedFile(tab.short, item);
-    row.dataset.revFile = item.name;
+    decorateGalleryRow(row, item.name);
     row.append(name, buildReviewControls(tab.short, item.name));
     if (item.kind === "audio") {
       const audio = document.createElement("audio");
@@ -2657,12 +3247,12 @@
   function setReviewStatus(kind, detail) {
     els.reviewStatus.classList.remove("error", "unsaved");
     if (kind === "unsaved") {
-      els.reviewStatus.textContent = "Unsaved…";
+      els.reviewStatus.textContent = "Unsaved";
       els.reviewStatus.classList.add("unsaved");
     } else if (kind === "saving") {
       els.reviewStatus.textContent = "Saving…";
     } else if (kind === "saved") {
-      els.reviewStatus.textContent = "Saved " + (detail || "");
+      els.reviewStatus.textContent = "Saved ✓ " + (detail || "");
     } else if (kind === "error") {
       els.reviewStatus.textContent = detail || "Could not save review";
       els.reviewStatus.classList.add("error");
@@ -2677,22 +3267,47 @@
     return Number.isFinite(ms) ? formatWhen(ms) : review.updatedAt;
   }
 
+  function paintVerdictButtons() {
+    const yesOn = els.reviewYes.classList.contains("on");
+    const noOn = els.reviewNo.classList.contains("on");
+    els.reviewYes.setAttribute("aria-pressed", yesOn ? "true" : "false");
+    els.reviewNo.setAttribute("aria-pressed", noOn ? "true" : "false");
+    els.reviewYes.textContent = yesOn ? "✓ Yes" : "Yes";
+    els.reviewNo.textContent = noOn ? "✕ No" : "No";
+  }
+
+  function growReviewNote() {
+    const el = els.reviewNote;
+    if (!el || els.reviewBar.hidden) return;
+    const max = 172;
+    el.style.height = "auto";
+    const next = Math.max(32, Math.min(max, el.scrollHeight));
+    el.style.height = next + "px";
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }
+
   function syncReviewBar() {
     const tab = state.active;
     const show = fileTabActive();
     els.reviewBar.hidden = !show;
     if (!show) return;
-    if (state.reviewDraftDirty || state.reviewSaving) return;
+    if (state.reviewDraftDirty || state.reviewSaving) {
+      paintVerdictButtons();
+      growReviewNote();
+      return;
+    }
     const review = reviewOf(tab.short, tab.file);
     const verdict = reviewVerdict(review);
     els.reviewYes.classList.toggle("on", verdict === "yes");
     els.reviewNo.classList.toggle("on", verdict === "no");
+    paintVerdictButtons();
     const note = reviewNoteText(review);
     if (els.reviewNote.value !== note) els.reviewNote.value = note;
     const label = savedLabel(review);
     els.reviewWhen.textContent = "";
     if (label) setReviewStatus("saved", label);
     else setReviewStatus("");
+    growReviewNote();
   }
 
   async function saveReviewFor(short, file, verdict, note, opts) {
@@ -2708,6 +3323,7 @@
       if (data.review) state.reviews[data.path] = data.review;
       else delete state.reviews[data.path];
     }
+    maybeDismissReady();
     renderSidebar();
     if (!opts.skipGalleryRender && state.active && state.active.kind === "gallery") maybeRenderGallery(state.active);
     if (!opts.skipBarSync) syncReviewBar();
@@ -2803,6 +3419,7 @@
     const wasOn = button.classList.contains("on");
     button.classList.toggle("on", !wasOn);
     if (!wasOn) other.classList.remove("on");
+    paintVerdictButtons();
     scheduleReviewSave();
     if (state.reviewSaveTimer) {
       clearTimeout(state.reviewSaveTimer);
@@ -2825,11 +3442,297 @@
       state.reviewDraftDirty = false;
       els.reviewYes.classList.remove("on");
       els.reviewNo.classList.remove("on");
+      paintVerdictButtons();
       els.reviewNote.value = "";
+      growReviewNote();
       els.reviewWhen.textContent = "";
       setReviewStatus("");
       if (had) showBanner("Review cleared", "ok", 2);
     });
+  }
+
+  function saveReviewNow() {
+    if (!fileTabActive()) return;
+    state.reviewDraftDirty = true;
+    if (state.reviewSaveTimer) {
+      clearTimeout(state.reviewSaveTimer);
+      state.reviewSaveTimer = null;
+    }
+    flushReviewDraft().catch((err) => showBanner(err.message, "warn", 5));
+  }
+
+  function setBarVerdict(verdict) {
+    const which = verdict === "yes" ? "reviewYes" : "reviewNo";
+    if (els[which].classList.contains("on")) return;
+    toggleBarVerdict(which);
+  }
+
+  function setRowVerdict(row, verdict) {
+    if (!row) return;
+    const yes = row.querySelector(".quick-rev button.yes");
+    const no = row.querySelector(".quick-rev button.no");
+    if (!yes || !no) return;
+    if (verdict === "yes") {
+      if (!yes.classList.contains("on")) yes.click();
+    } else if (!no.classList.contains("on")) no.click();
+  }
+
+  function clearRowVerdict(row) {
+    if (!row) return;
+    const yes = row.querySelector(".quick-rev button.yes");
+    const no = row.querySelector(".quick-rev button.no");
+    if (yes && yes.classList.contains("on")) yes.click();
+    else if (no && no.classList.contains("on")) no.click();
+  }
+
+  function shortcutVerdict(verdict) {
+    const tab = state.active;
+    if (!tab) return;
+    if (tab.kind === "gallery") {
+      setRowVerdict(currentGalleryRow(), verdict);
+      return;
+    }
+    if (fileTabActive()) setBarVerdict(verdict);
+  }
+
+  function shortcutClearVerdict() {
+    const tab = state.active;
+    if (!tab) return;
+    if (tab.kind === "gallery") {
+      clearRowVerdict(currentGalleryRow());
+      return;
+    }
+    if (!fileTabActive()) return;
+    if (els.reviewYes.classList.contains("on")) els.reviewYes.click();
+    else if (els.reviewNo.classList.contains("on")) els.reviewNo.click();
+  }
+
+  function folderFilesFor(tab) {
+    if (!tab) return [];
+    if (tab.kind === "gallery") return tab.files || [];
+    return galleryFiles(tab.short, Ui.folderOf(tab.file));
+  }
+
+  function moveReviewFocus(delta) {
+    const tab = state.active;
+    if (!tab) return;
+    if (tab.kind === "gallery") {
+      const next = Ui.moveSelection(tab.files || [], state.galleryFocus, delta);
+      if (!next || next === state.galleryFocus) return;
+      state.galleryFocus = next;
+      highlightGalleryFocus(true);
+      return;
+    }
+    const files = galleryFiles(tab.short, Ui.folderOf(tab.file));
+    const next = Ui.stepSibling(files, tab.file, delta);
+    if (!next) return;
+    const item = files.find((entry) => entry.name === next);
+    if (item) openListedFile(tab.short, item);
+  }
+
+  function goNextUnreviewed() {
+    const tab = state.active;
+    if (!tab) return;
+    const reviewed = (name) => reviewHasVerdict(reviewOf(tab.short, name));
+    if (tab.kind === "gallery") {
+      const next = Ui.nextUnreviewedName(tab.files || [], state.galleryFocus, reviewed);
+      if (!next) return;
+      state.galleryFocus = next;
+      highlightGalleryFocus(true);
+      return;
+    }
+    const files = folderFilesFor(tab);
+    const next = Ui.nextUnreviewedName(files, tab.file, reviewed);
+    if (!next) return;
+    const item = files.find((entry) => entry.name === next);
+    if (item) openListedFile(tab.short, item);
+  }
+
+  async function noteForReadyTarget(target, onFile) {
+    if (onFile && (state.reviewDraftDirty || state.reviewSaving)) return els.reviewNote.value;
+    try {
+      const fresh = await api("/api/reviews?path=" + encodeURIComponent(reviewKey(target.short, target.file)));
+      const key = (fresh && fresh.path) || reviewKey(target.short, target.file);
+      if (fresh && fresh.review) state.reviews[key] = fresh.review;
+      else delete state.reviews[key];
+    } catch {
+      // Keep the note already loaded.
+    }
+    return reviewNoteText(reviewOf(target.short, target.file));
+  }
+
+  async function applyReadyVerdict(verdict) {
+    const target = state.readyTarget;
+    if (!target || target.folder || !target.file) return;
+    const onFile = fileTabActive() && state.active.short === target.short && state.active.file === target.file;
+    try {
+      const note = await noteForReadyTarget(target, onFile);
+      if (onFile) {
+        if (els.reviewNote.value !== note) els.reviewNote.value = note;
+        const which = verdict === "yes" ? "reviewYes" : "reviewNo";
+        const other = verdict === "yes" ? "reviewNo" : "reviewYes";
+        els[which].classList.add("on");
+        els[other].classList.remove("on");
+        paintVerdictButtons();
+        state.reviewDraftDirty = true;
+        if (state.reviewSaveTimer) {
+          clearTimeout(state.reviewSaveTimer);
+          state.reviewSaveTimer = null;
+        }
+        const ok = await flushReviewDraft();
+        if (!ok) return;
+      } else {
+        await saveReviewFor(target.short, target.file, verdict, note);
+      }
+      dismissReady();
+    } catch (err) {
+      showBanner(err.message || "Could not save review", "warn", 5);
+    }
+  }
+
+  function isTypingTarget(el) {
+    if (!el || el === document.body || el === document.documentElement) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    return Boolean(el.isContentEditable);
+  }
+
+  function reviewKeysBlocked(event) {
+    if (!els.quickOpen.hidden || !els.help.hidden) return true;
+    return isTypingTarget(event.target) || isTypingTarget(document.activeElement);
+  }
+
+  function kindMark(kind) {
+    if (kind === "audio") return "♪";
+    if (kind === "video") return "▶";
+    if (kind === "image") return "▣";
+    if (kind === "text") return "☰";
+    return "•";
+  }
+
+  function quickCatalog() {
+    const notes = new Set();
+    const rows = [];
+    for (const folder of state.shorts) {
+      for (const item of allShortFiles(folder)) {
+        const file = String(item.name || "").replace(/\\/g, "/");
+        rows.push({ short: folder.name, file: file });
+        if (file.toLowerCase().endsWith(".review.md")) notes.add(folder.name + "/" + file);
+      }
+    }
+    return rows.map((row) => {
+      const review = reviewOf(row.short, row.file);
+      return {
+        short: row.short,
+        file: row.file,
+        verdict: reviewVerdict(review),
+        note: reviewNoteText(review),
+        hasTimestampNotes: notes.has(row.short + "/" + row.file + ".review.md"),
+      };
+    });
+  }
+
+  function renderQuickPath(path, ranges) {
+    const frag = document.createDocumentFragment();
+    let cursor = 0;
+    for (const range of ranges || []) {
+      const start = range[0];
+      const end = range[1];
+      if (start > cursor) frag.append(document.createTextNode(path.slice(cursor, start)));
+      const mark = document.createElement("mark");
+      mark.textContent = path.slice(start, end);
+      frag.append(mark);
+      cursor = end;
+    }
+    if (cursor < path.length) frag.append(document.createTextNode(path.slice(cursor)));
+    return frag;
+  }
+
+  function paintQuickSelection() {
+    const rows = els.quickList.querySelectorAll(".quick-row");
+    rows.forEach((row, index) => {
+      const on = index === state.quickIndex;
+      row.setAttribute("aria-selected", on ? "true" : "false");
+      if (on) {
+        els.quickInput.setAttribute("aria-activedescendant", row.id);
+        row.scrollIntoView({ block: "nearest" });
+      }
+    });
+  }
+
+  function refreshQuickList() {
+    const hits = Ui.matchQuickOpen(quickCatalog(), els.quickInput.value, 50);
+    state.quickHits = hits;
+    if (!hits.length) state.quickIndex = 0;
+    else if (state.quickIndex >= hits.length) state.quickIndex = hits.length - 1;
+    else if (state.quickIndex < 0) state.quickIndex = 0;
+    els.quickList.replaceChildren();
+    if (!hits.length) {
+      const empty = document.createElement("p");
+      empty.className = "quick-empty muted";
+      empty.textContent = "No matching files";
+      els.quickList.append(empty);
+      els.quickInput.removeAttribute("aria-activedescendant");
+      return;
+    }
+    hits.forEach((hit, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "quick-row";
+      btn.id = "quickOpt" + index;
+      btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", index === state.quickIndex ? "true" : "false");
+      const icon = document.createElement("span");
+      icon.className = "quick-kind " + hit.kind;
+      icon.textContent = kindMark(hit.kind);
+      icon.title = hit.kind;
+      const path = document.createElement("span");
+      path.className = "quick-path";
+      path.append(renderQuickPath(hit.path, hit.ranges));
+      btn.append(icon, path);
+      appendReviewBadge(btn, hit.short, hit.file);
+      btn.addEventListener("mousemove", () => {
+        if (state.quickIndex === index) return;
+        state.quickIndex = index;
+        paintQuickSelection();
+      });
+      btn.addEventListener("click", () => openQuickHit(hit));
+      els.quickList.append(btn);
+    });
+    const selected = document.getElementById("quickOpt" + state.quickIndex);
+    if (selected) els.quickInput.setAttribute("aria-activedescendant", selected.id);
+  }
+
+  function openQuickHit(hit) {
+    if (!hit) return;
+    hideQuickOpen();
+    openListedFile(hit.short, { name: hit.file, kind: inferKind(hit.file) });
+  }
+
+  function showQuickOpen() {
+    hideTabMenu();
+    hideTabList();
+    hideHelp();
+    els.quickOpen.hidden = false;
+    els.quickInput.value = "";
+    state.quickIndex = 0;
+    refreshQuickList();
+    els.quickInput.focus();
+  }
+
+  function hideQuickOpen() {
+    if (els.quickOpen.hidden) return;
+    els.quickOpen.hidden = true;
+    state.quickHits = [];
+    els.quickInput.removeAttribute("aria-activedescendant");
+  }
+
+  function moveQuickSelection(delta) {
+    if (!state.quickHits.length) return;
+    const next = state.quickIndex + delta;
+    if (next < 0 || next >= state.quickHits.length) return;
+    state.quickIndex = next;
+    paintQuickSelection();
   }
 
   async function refreshReview(tab) {
@@ -2890,7 +3793,7 @@
     } else if (cmd.action === "notify_ready") {
       const loc = await resolvePath(commandPath(cmd));
       await openReview(loc);
-      showReady(cmd.kind, cmd.note ? String(cmd.note) : "");
+      showReady(cmd.kind, cmd.note ? String(cmd.note) : "", loc);
     }
   }
 
@@ -2921,6 +3824,7 @@
     state.root = tree.root || "";
     state.shorts = tree.shorts || [];
     state.reviews = (reviewData && reviewData.reviews) || {};
+    maybeDismissReady();
     state.status = tree.missing ? "SHORTS_ROOT does not exist" : "Updated " + new Date().toLocaleTimeString();
     const sig = JSON.stringify({ shorts: state.shorts, reviews: state.reviews, filters: state.filters, unreviewedOnly: state.unreviewedOnly });
     if (sig !== state.treeSig) {
@@ -2982,6 +3886,7 @@
     const [tab] = state.tabs.splice(from, 1);
     state.tabs.splice(to, 0, tab);
     renderTabs();
+    if (!els.tabList.hidden) openTabList();
     persistTabs();
   }
 
@@ -3106,7 +4011,69 @@
   els.saveBtn.addEventListener("click", () => saveActive().catch((err) => showBanner(err.message, "warn", 5)));
   els.reloadDisk.addEventListener("click", reloadFromDisk);
   els.keepMine.addEventListener("click", keepMine);
-  els.readyDismiss.addEventListener("click", () => { els.ready.hidden = true; });
+  els.readyDismiss.addEventListener("click", () => dismissReady());
+  els.readyYes.addEventListener("click", () => {
+    applyReadyVerdict("yes").catch((err) => showBanner(err.message, "warn", 5));
+  });
+  els.readyNo.addEventListener("click", () => {
+    applyReadyVerdict("no").catch((err) => showBanner(err.message, "warn", 5));
+  });
+  els.readyNext.addEventListener("click", () => goNextUnreviewed());
+  els.reviewNext.addEventListener("click", () => goNextUnreviewed());
+  els.nextUnreviewedBtn.addEventListener("click", () => goNextUnreviewed());
+  els.tabOverflow.addEventListener("click", () => {
+    if (els.tabList.hidden) openTabList();
+    else hideTabList();
+  });
+  els.tabMenu.addEventListener("click", (event) => {
+    const btn = event.target.closest("button");
+    if (!btn || !els.tabMenu.contains(btn)) return;
+    const tab = state.tabMenuTab;
+    const act = btn.dataset.act;
+    hideTabMenu();
+    if (act === "close" && tab) closeTab(tab);
+    else if (act === "others" && tab) closeOtherTabs(tab);
+    else if (act === "right" && tab) closeTabsToTheRight(tab);
+    else if (act === "all") closeAll();
+  });
+  els.helpBtn.addEventListener("click", () => showHelp());
+  els.helpClose.addEventListener("click", () => hideHelp());
+  els.help.addEventListener("click", (event) => {
+    if (event.target === els.help) hideHelp();
+  });
+  els.quickOpen.addEventListener("click", (event) => {
+    if (event.target === els.quickOpen) hideQuickOpen();
+  });
+  els.quickInput.addEventListener("input", () => {
+    state.quickIndex = 0;
+    refreshQuickList();
+  });
+  els.quickInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      event.stopPropagation();
+      moveQuickSelection(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      event.stopPropagation();
+      moveQuickSelection(-1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      const hit = state.quickHits[state.quickIndex];
+      if (hit) openQuickHit(hit);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      hideQuickOpen();
+    }
+  });
+  els.tabs.addEventListener("scroll", () => hideTabMenu());
+  document.addEventListener("click", (event) => {
+    if (event.button !== 0) return;
+    if (!els.tabMenu.hidden && !els.tabMenu.contains(event.target)) hideTabMenu();
+    if (!els.tabList.hidden && !els.tabOverflowWrap.contains(event.target)) hideTabList();
+  });
   els.noteForm.addEventListener("submit", (event) => addNote(event).catch((err) => showBanner(err.message, "warn", 5)));
   els.filters.addEventListener("click", (event) => {
     const btn = event.target.closest("[data-filter]");
@@ -3125,7 +4092,10 @@
   });
   els.reviewYes.addEventListener("click", () => toggleBarVerdict("reviewYes"));
   els.reviewNo.addEventListener("click", () => toggleBarVerdict("reviewNo"));
-  els.reviewNote.addEventListener("input", scheduleReviewSave);
+  els.reviewNote.addEventListener("input", () => {
+    growReviewNote();
+    scheduleReviewSave();
+  });
   els.reviewNote.addEventListener("blur", () => {
     if (!state.reviewDraftDirty && !state.reviewSaving) return;
     if (state.reviewSaveTimer) {
@@ -3190,9 +4160,97 @@
   els.audio.addEventListener("timeupdate", onTime);
   els.video.addEventListener("timeupdate", onTime);
   document.addEventListener("keydown", (event) => {
-    if ((event.ctrlKey || event.metaKey) && (event.key === "s" || event.key === "S")) {
+    const cmd = event.ctrlKey || event.metaKey;
+    if (cmd && !event.altKey && (event.key === "s" || event.key === "S")) {
       event.preventDefault();
       saveActive().catch((err) => showBanner(err.message, "warn", 5));
+      return;
+    }
+    if (cmd && !event.altKey && !event.shiftKey && (event.key === "k" || event.key === "K" || event.key === "p" || event.key === "P")) {
+      event.preventDefault();
+      if (els.quickOpen.hidden) showQuickOpen();
+      else hideQuickOpen();
+      return;
+    }
+    if (cmd && !event.altKey && event.key === "Enter") {
+      if (!els.quickOpen.hidden) return;
+      const typing = isTypingTarget(event.target);
+      if (event.target === els.reviewNote || (!typing && fileTabActive())) {
+        event.preventDefault();
+        saveReviewNow();
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      if (!els.quickOpen.hidden) {
+        hideQuickOpen();
+        event.preventDefault();
+        return;
+      }
+      if (!els.tabMenu.hidden) {
+        hideTabMenu();
+        event.preventDefault();
+        return;
+      }
+      if (!els.tabList.hidden) {
+        hideTabList();
+        event.preventDefault();
+        return;
+      }
+      if (!els.help.hidden) {
+        hideHelp();
+        event.preventDefault();
+        return;
+      }
+      if (!els.ready.hidden) {
+        dismissReady();
+        event.preventDefault();
+      }
+      return;
+    }
+    if (!els.quickOpen.hidden) return;
+    if (reviewKeysBlocked(event)) return;
+    if (!els.help.hidden || !els.tabMenu.hidden || !els.tabList.hidden) return;
+    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+      event.preventDefault();
+      showHelp();
+      return;
+    }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.shiftKey && event.key !== "J" && event.key !== "j") return;
+    if (event.shiftKey && (event.key === "J" || event.key === "j")) {
+      event.preventDefault();
+      goNextUnreviewed();
+      return;
+    }
+    if (event.key === "y" || event.key === "Y") {
+      event.preventDefault();
+      shortcutVerdict("yes");
+      return;
+    }
+    if (event.key === "n" || event.key === "N") {
+      event.preventDefault();
+      shortcutVerdict("no");
+      return;
+    }
+    if (event.key === "u" || event.key === "U") {
+      event.preventDefault();
+      shortcutClearVerdict();
+      return;
+    }
+    if (event.key === "j" || event.key === "J" || event.key === "ArrowDown") {
+      event.preventDefault();
+      moveReviewFocus(1);
+      return;
+    }
+    if (event.key === "k" || event.key === "K" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveReviewFocus(-1);
+      return;
+    }
+    if (event.key === ".") {
+      event.preventDefault();
+      goNextUnreviewed();
     }
   });
   if (window.ResizeObserver) {
